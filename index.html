@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CallForUs | Smart Dashboard</title>
+    <title>CallForUs | Dashboard</title>
     
-    <!-- Font Inter & Poppins -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
-    <!-- Icone Material -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
     <style>
@@ -147,10 +145,9 @@
         }
         .tag-pill:hover { transform: translateY(-1px); }
 
-        /* --- MAIN GRID (Layout Modificato) --- */
+        /* --- MAIN GRID --- */
         .main-grid {
             display: grid; 
-            /* 1fr prende tutto lo spazio rimanente, 270px è la sidebar fissa (era 360px) */
             grid-template-columns: 1fr 270px;
             gap: 24px; padding: 24px;
             flex-grow: 1; overflow: hidden;
@@ -198,7 +195,7 @@
         }
         .note-box strong { font-size: 11px; color: var(--brand-yellow); text-transform: uppercase; margin-bottom: 4px; display:block; background: var(--brand-black); width: fit-content; padding: 2px 6px; border-radius: 4px;}
 
-        /* SIDEBAR (Right) - STRETTA */
+        /* SIDEBAR (Right) */
         .sidebar {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -214,17 +211,16 @@
         }
         .sidebar-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
 
-        /* Inputs - Grid adattata alla larghezza minore */
+        /* Inputs */
         .call-row { 
             display: grid; 
-            /* Colonne più proporzionate per lo spazio stretto */
             grid-template-columns: 1.5fr 0.8fr 0.8fr; 
             gap: 5px; margin-bottom: 8px; 
         }
         .sb-input {
             background: var(--input-bg); border: 1px solid var(--border);
             color: var(--text-main); padding: 6px 8px; border-radius: var(--radius-S);
-            width: 100%; font-size: 11px; transition: 0.2s; /* Font leggermente più piccolo per stare nello spazio */
+            width: 100%; font-size: 11px; transition: 0.2s; 
         }
         .sb-input:focus { border-color: var(--brand-yellow); background: var(--bg-card); }
 
@@ -309,12 +305,10 @@
             </div>
 
             <div class="header-actions">
-                <!-- MEET BUTTON: Apre Calendar Event Edit -->
                 <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-meet">
                     <span class="material-icons-round">calendar_today</span>
                     Organizza Call
                 </a>
-
                 <button class="icon-btn" onclick="forceSync()" title="Sincronizza"><span class="material-icons-round">sync</span></button>
                 <button class="icon-btn" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
             </div>
@@ -361,7 +355,6 @@
     </div>
 
     <script>
-        // CONFIG
         const PWD = "giuseppe90";
         const PANTRY_URL = "https://getpantry.cloud/apiv1/pantry/e39b701d-95a9-48c0-ae96-d13b53856c94/basket/Dashboard";
         const GCAL_1 = "https://script.google.com/macros/s/AKfycbwQd1ocRZroEaEKw08JQEQ89owrJnN1e4WKpctx449s1mDxUZN7ObtQzTzBVLb3W4NB/exec";
@@ -405,7 +398,8 @@
             document.addEventListener('focusin', e => { if(e.target.isContentEditable) lastFocus = e.target; });
             document.addEventListener('input', e => { if(e.target.matches('[contenteditable], input')) deferredSave(); });
             
-            setInterval(() => loadData(true), 300000); // 5 Minuti
+            // Sync 5 min
+            setInterval(() => loadData(true), 300000); 
             
             if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
             updateDateDisplay();
@@ -475,15 +469,27 @@
             globalData['TAGS'] = myTags; 
 
             try {
-                await fetch(PANTRY_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(globalData) });
+                // Fetch modificata per GitHub (referrerPolicy e mode)
+                await fetch(PANTRY_URL, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify(globalData),
+                    referrerPolicy: 'no-referrer',
+                    mode: 'cors'
+                });
                 setStatus('Salvato', 'ok');
-            } catch(e) { setStatus('Errore', 'err'); }
+            } catch(e) { setStatus('Errore', 'err'); console.log(e); }
         }
 
         async function loadData(silent) {
             if(!silent) setStatus('Sync...', 'wait');
             try {
-                const res = await fetch(PANTRY_URL + "?t=" + Date.now());
+                // Fetch modificata per GitHub
+                const res = await fetch(PANTRY_URL + "?t=" + Date.now(), {
+                    referrerPolicy: 'no-referrer',
+                    mode: 'cors'
+                });
+                
                 if(res.ok) {
                     const json = await res.json();
                     globalData = json || {};
@@ -517,14 +523,12 @@
             let start = new Date(currentMon);
             let end = new Date(currentMon); end.setDate(end.getDate() + 5);
             
-            // Fetch parallelo
             const fetch1 = fetch(`${GCAL_1}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json());
             const fetch2 = fetch(`${GCAL_2}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json());
 
             try {
                 const [evts1, evts2] = await Promise.all([fetch1, fetch2]);
 
-                // Clean
                 const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
                 for(let i=1; i<=5; i++) document.getElementById(ids[i]).innerHTML = '';
 
