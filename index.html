@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CallForUs | Dashboard</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
     <style>
@@ -66,8 +66,14 @@
         .date-display { font-weight: 600; font-size: 14px; min-width: 140px; text-align: center; }
         .header-actions { display: flex; align-items: center; gap: 12px; }
 
+        /* PULSANTI */
         .btn-meet { display: flex; align-items: center; gap: 8px; background: var(--brand-yellow); color: var(--brand-black); text-decoration: none; padding: 8px 16px; border-radius: var(--radius-M); font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(255, 214, 0, 0.25); transition: all 0.2s ease; }
         .btn-meet:hover { transform: translateY(-2px); }
+        
+        .btn-manual-save { display: flex; align-items: center; gap: 6px; background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: var(--radius-M); font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
+        .btn-manual-save:hover { background: #059669; transform: translateY(-2px); }
+        .btn-manual-save:active { transform: scale(0.95); }
+
         .icon-btn { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); width: 40px; height: 40px; border-radius: var(--radius-M); cursor: pointer; display: grid; place-items: center; transition: 0.2s; }
         .icon-btn:hover { background: var(--bg-card); color: var(--text-main); }
 
@@ -98,7 +104,6 @@
         .sidebar-header { background: var(--brand-black); color: #fff; padding: 14px; font-size: 13px; font-weight: 600; text-align: center; letter-spacing: 0.5px; }
         .sidebar-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
 
-        /* INPUTS */
         .call-row { display: grid; grid-template-columns: 1.5fr 0.8fr 0.8fr; gap: 5px; margin-bottom: 8px; }
         .sb-input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 6px 8px; border-radius: var(--radius-S); width: 100%; font-size: 11px; transition: 0.2s; }
         .sb-input:focus { border-color: var(--brand-yellow); background: var(--bg-card); }
@@ -141,11 +146,10 @@
         </div>
     </div>
 
-    <!-- LOADING (con timeout di sicurezza) -->
+    <!-- LOADING -->
     <div id="loadingScreen" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px);">
         <div class="loader"></div>
         <div style="font-weight:700; color:#fff;">Sincronizzazione in corso...</div>
-        <div style="font-size:11px; color:#ddd; margin-top:10px;">Attendi qualche secondo</div>
     </div>
 
     <div id="appContent" style="display:none; flex-direction: column; height: 100%;">
@@ -162,11 +166,17 @@
             </div>
 
             <div class="header-actions">
+                <!-- PULSANTE SALVA MANUALE (NUOVO) -->
+                <button class="btn-manual-save" onclick="manualSave()">
+                    <span class="material-icons-round">save</span>
+                    SALVA ORA
+                </button>
+
                 <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-meet">
                     <span class="material-icons-round">calendar_today</span>
                     Organizza Call
                 </a>
-                <button class="icon-btn" onclick="forceSync()" title="Sincronizza"><span class="material-icons-round">sync</span></button>
+                <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">sync</span></button>
                 <button class="icon-btn" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
             </div>
         </header>
@@ -253,12 +263,12 @@
             document.getElementById('loginScreen').style.display='none';
             document.getElementById('appContent').style.display='flex';
             
-            // Timeout di sicurezza: se il DB non risponde in 3 secondi, sblocca comunque l'app
+            // Timeout sicurezza
             document.getElementById('loadingScreen').style.display = 'flex';
             setTimeout(() => {
                 if(!isDataLoaded) {
                     document.getElementById('loadingScreen').style.display = 'none';
-                    isDataLoaded = true; // Forza sblocco
+                    isDataLoaded = true; 
                     setStatus('Offline/Errore', 'err');
                 }
             }, 3000);
@@ -267,7 +277,8 @@
             document.addEventListener('focusin', e => { if(e.target.isContentEditable) lastFocus = e.target; });
             document.addEventListener('input', e => { if(e.target.matches('[contenteditable], input')) deferredSave(); });
             
-            setInterval(() => loadData(true), 300000);
+            // SYNC 5 Minuti
+            setInterval(() => loadData(true), 300000); 
             
             if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
             updateDateDisplay();
@@ -312,14 +323,21 @@
 
         function deferredSave() {
             if (!isDataLoaded) return;
-            setStatus('Salvataggio...', 'wait');
+            setStatus('In attesa...', 'wait');
             clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => saveData(), 2000);
+            saveTimer = setTimeout(() => saveData(), 3000); // Ritardo aumentato a 3s
+        }
+
+        function manualSave() {
+            saveData(true);
         }
 
         async function saveData(immediate) {
             if (!isDataLoaded) return;
             if(immediate) clearTimeout(saveTimer);
+            
+            setStatus('Salvataggio...', 'wait');
+            
             const key = getWeekKey();
             const sbInputs = Array.from(document.querySelectorAll('.sb-input')).map(i => i.value);
             const sbChecks = Array.from(document.querySelectorAll('.chk')).map(c => c.classList.contains('checked'));
@@ -346,7 +364,10 @@
                     body: JSON.stringify(globalData)
                 });
                 setStatus('Salvato', 'ok');
-            } catch(e) { setStatus('Errore Database', 'err'); }
+            } catch(e) { 
+                setStatus('Errore Save', 'err'); 
+                console.error(e);
+            }
         }
 
         async function loadData(silent) {
@@ -362,27 +383,19 @@
                     document.getElementById('loadingScreen').style.display = 'none';
                     if(!silent) setStatus('Online', 'ok');
                 } else {
-                    // Errore server, ma sblocchiamo per permettere di scrivere
                     if(!silent) setStatus('Errore Server', 'err');
-                    if(!isDataLoaded) {
-                        isDataLoaded = true;
-                        document.getElementById('loadingScreen').style.display = 'none';
-                    }
+                    if(!isDataLoaded) { isDataLoaded = true; document.getElementById('loadingScreen').style.display = 'none'; }
                 }
             } catch(e) { 
                 if(!silent) setStatus('Offline', 'err');
-                // Se offline, sblocca comunque
-                if(!isDataLoaded) {
-                    isDataLoaded = true;
-                    document.getElementById('loadingScreen').style.display = 'none';
-                }
+                if(!isDataLoaded) { isDataLoaded = true; document.getElementById('loadingScreen').style.display = 'none'; }
             }
         }
 
         function renderWeek() {
             const key = getWeekKey();
             const d = globalData[key];
-            const set = (id, val) => { const el = document.getElementById(id); if(el.innerHTML !== (val || '')) el.innerHTML = val || ''; };
+            const set = (id, val) => { const el = document.getElementById(id); const cleanVal = val || ''; if(el.innerHTML !== cleanVal) el.innerHTML = cleanVal; };
             
             if(!d) {
                 ['mon','tue','wed','thu','fri','note1','note2','note3'].forEach(id => set(id, ''));
@@ -439,7 +452,6 @@
 
             } catch(e) { 
                 console.log('GCal err', e);
-                // Non blocchiamo l'app se Google fallisce
                 setStatus('Err Google', 'wait');
             }
         }
