@@ -42,13 +42,12 @@
         * { box-sizing: border-box; outline: none; }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s ease; }
 
-        /* OVERLAYS (Login & Loading) */
-        .overlay { position: fixed; inset: 0; background: var(--bg-body); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: opacity 0.3s; }
+        /* OVERLAYS */
+        .overlay { position: fixed; inset: 0; background: var(--bg-body); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
         .login-box { background: var(--bg-card); padding: 40px; border-radius: 24px; width: 340px; text-align: center; box-shadow: var(--shadow-card); border: 1px solid var(--border); }
         .login-input { width: 100%; padding: 14px; margin: 20px 0; border: 2px solid var(--border); border-radius: 12px; background: var(--input-bg); font-size: 16px; text-align: center; color:var(--text-main); }
         .login-btn { width: 100%; padding: 14px; background: var(--brand-black); color: #fff; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
         
-        /* Loading Spinner */
         .loader { border: 4px solid var(--border); border-top: 4px solid var(--brand-yellow); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -99,6 +98,7 @@
         .sidebar-header { background: var(--brand-black); color: #fff; padding: 14px; font-size: 13px; font-weight: 600; text-align: center; letter-spacing: 0.5px; }
         .sidebar-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
 
+        /* INPUTS */
         .call-row { display: grid; grid-template-columns: 1.5fr 0.8fr 0.8fr; gap: 5px; margin-bottom: 8px; }
         .sb-input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 6px 8px; border-radius: var(--radius-S); width: 100%; font-size: 11px; transition: 0.2s; }
         .sb-input:focus { border-color: var(--brand-yellow); background: var(--bg-card); }
@@ -107,11 +107,12 @@
         .chk.checked { background: var(--brand-yellow); border-color: var(--brand-yellow); position: relative; }
         .chk.checked::after { content: ''; position: absolute; top: 3px; left: 6px; width: 5px; height: 9px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 
+        /* GOOGLE EVENTS */
         .gcal-wrapper { padding: 8px 8px 0 8px; display: flex; flex-direction: column; gap: 6px; }
         .gcal-wrapper:empty { display: none; }
-        a.gcal-event { display: flex !important; align-items: center; width: 100%; background: #FFF9C4; border-left: 3px solid var(--brand-yellow); color: #000; padding: 8px 10px; border-radius: 6px; font-size: 11px; text-decoration: none; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; z-index: 10; }
+        a.gcal-event { display: flex !important; align-items: center; width: 100%; background: #FFF9C4; border-left: 3px solid var(--brand-yellow); color: #000; padding: 8px 10px; border-radius: 6px; font-size: 11px; text-decoration: none; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; z-index: 10; margin-bottom: 4px; }
         a.gcal-event:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        div.gcal-event { display: block; background: var(--input-bg); border-left: 3px solid #ccc; padding: 8px; border-radius: 6px; font-size: 11px; color: var(--text-muted); }
+        div.gcal-event { display: block; background: var(--input-bg); border-left: 3px solid #ccc; padding: 8px; border-radius: 6px; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
         a.gcal-event.gear-event { background: #F3F4F6; border-left-color: var(--brand-black); }
         [data-theme="dark"] a.gcal-event.gear-event { background: #374151; border-left-color: #fff; color: #fff; }
         .gcal-tag { font-weight: 800; font-size: 9px; background: var(--brand-black); color: white; padding: 2px 6px; border-radius: 4px; margin-left: auto; text-transform: uppercase; }
@@ -129,7 +130,7 @@
 </head>
 <body data-theme="light">
 
-    <!-- LOGIN SCREEN -->
+    <!-- LOGIN -->
     <div id="loginScreen" class="overlay">
         <div class="login-box">
             <img src="logo.png" alt="Logo" style="height: 50px; margin-bottom: 20px;" onerror="this.style.display='none'; document.getElementById('txtL').style.display='block'">
@@ -140,10 +141,11 @@
         </div>
     </div>
 
-    <!-- LOADING SCREEN (Blocca input finché non scarica i dati) -->
+    <!-- LOADING (con timeout di sicurezza) -->
     <div id="loadingScreen" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px);">
         <div class="loader"></div>
         <div style="font-weight:700; color:#fff;">Sincronizzazione in corso...</div>
+        <div style="font-size:11px; color:#ddd; margin-top:10px;">Attendi qualche secondo</div>
     </div>
 
     <div id="appContent" style="display:none; flex-direction: column; height: 100%;">
@@ -171,13 +173,13 @@
 
         <div class="toolbar">
             <div class="tool-grp">
-                <button class="icon-btn" onclick="fmt('bold')" style="width:34px; height:34px;"><span class="material-icons-round">format_bold</span></button>
-                <button class="icon-btn" onclick="fmt('italic')" style="width:34px; height:34px;"><span class="material-icons-round">format_italic</span></button>
-                <button class="icon-btn" onclick="fmt('strikeThrough')" style="width:34px; height:34px; color:#EF4444"><span class="material-icons-round">strikethrough_s</span></button>
-                <button class="icon-btn" onclick="fmt('removeFormat')" style="width:34px; height:34px;"><span class="material-icons-round">format_clear</span></button>
+                <button class="icon-btn" onclick="fmt('bold')"><span class="material-icons-round">format_bold</span></button>
+                <button class="icon-btn" onclick="fmt('italic')"><span class="material-icons-round">format_italic</span></button>
+                <button class="icon-btn" onclick="fmt('strikeThrough')" style="color:#EF4444"><span class="material-icons-round">strikethrough_s</span></button>
+                <button class="icon-btn" onclick="fmt('removeFormat')"><span class="material-icons-round">format_clear</span></button>
             </div>
             <div class="tool-grp" style="border:none">
-                <input type="color" id="tagColor" value="#FFD600" style="width:34px; height:34px; border:none; background:none; cursor:pointer">
+                <input type="color" id="tagColor" value="#FFD600" style="width:30px; height:30px; border:none; background:none; cursor:pointer">
                 <input type="text" id="tagName" class="tag-inp" placeholder="NUOVO TAG">
                 <button class="btn-add-tag" onclick="addTag()">AGGIUNGI</button>
             </div>
@@ -220,7 +222,7 @@
         let myTags = [];
         let saveTimer;
         let lastFocus = null;
-        let isDataLoaded = false; // FLAG DI SICUREZZA
+        let isDataLoaded = false;
 
         function getRealMonday() {
             const d = new Date();
@@ -251,32 +253,37 @@
             document.getElementById('loginScreen').style.display='none';
             document.getElementById('appContent').style.display='flex';
             
-            // MOSTRA LOADING E BLOCCA TUTTO
+            // Timeout di sicurezza: se il DB non risponde in 3 secondi, sblocca comunque l'app
             document.getElementById('loadingScreen').style.display = 'flex';
+            setTimeout(() => {
+                if(!isDataLoaded) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    isDataLoaded = true; // Forza sblocco
+                    setStatus('Offline/Errore', 'err');
+                }
+            }, 3000);
 
             renderSidebarStructure();
             document.addEventListener('focusin', e => { if(e.target.isContentEditable) lastFocus = e.target; });
             document.addEventListener('input', e => { if(e.target.matches('[contenteditable], input')) deferredSave(); });
             
-            setInterval(() => loadData(true), 300000); 
+            setInterval(() => loadData(true), 300000);
             
             if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
             updateDateDisplay();
             highlightToday();
-            
-            // CARICA E SBLOCCA SOLO SE SUCCESSO
             loadData(false);
         }
 
         function renderSidebarStructure() {
             const callList = document.getElementById('callList');
-            if(callList.innerHTML.trim() === "") {
+            if(!callList.innerHTML.trim()) {
                 let html = "";
                 for(let i=0; i<8; i++) html += `<div class="call-row"><input class="sb-input" placeholder="Cliente"><input class="sb-input" placeholder="Giorno"><input class="sb-input" placeholder="Ora"></div>`;
                 callList.innerHTML = html;
             }
             const todoList = document.getElementById('todoList');
-            if(todoList.innerHTML.trim() === "") {
+            if(!todoList.innerHTML.trim()) {
                 let html = "";
                 for(let i=0; i<12; i++) html += `<div class="todo-row"><div class="chk" onclick="this.classList.toggle('checked'); deferredSave()"></div><input class="sb-input" placeholder="Attività..." oninput="deferredSave()"></div>`;
                 todoList.innerHTML = html;
@@ -291,7 +298,6 @@
 
         async function changeWeek(dir) {
             await saveData(true); 
-            // Mostra loading mentre cambia
             document.getElementById('loadingScreen').style.display = 'flex';
             currentMon.setDate(currentMon.getDate() + (dir * 7));
             updateDateDisplay();
@@ -305,18 +311,15 @@
         }
 
         function deferredSave() {
-            // NON SALVARE SE I DATI NON SONO STATI CARICATI
             if (!isDataLoaded) return;
-
             setStatus('Salvataggio...', 'wait');
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => saveData(), 2000);
         }
 
         async function saveData(immediate) {
-            if (!isDataLoaded) return; // STOP SICUREZZA
+            if (!isDataLoaded) return;
             if(immediate) clearTimeout(saveTimer);
-            
             const key = getWeekKey();
             const sbInputs = Array.from(document.querySelectorAll('.sb-input')).map(i => i.value);
             const sbChecks = Array.from(document.querySelectorAll('.chk')).map(c => c.classList.contains('checked'));
@@ -340,56 +343,46 @@
                 await fetch(PANTRY_URL, { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify(globalData),
-                    referrerPolicy: 'no-referrer',
-                    mode: 'cors'
+                    body: JSON.stringify(globalData)
                 });
                 setStatus('Salvato', 'ok');
-            } catch(e) { setStatus('Errore', 'err'); }
+            } catch(e) { setStatus('Errore Database', 'err'); }
         }
 
         async function loadData(silent) {
             if(!silent) setStatus('Sync...', 'wait');
             try {
-                const res = await fetch(PANTRY_URL + "?t=" + Date.now(), {
-                    referrerPolicy: 'no-referrer',
-                    mode: 'cors'
-                });
-                
+                const res = await fetch(PANTRY_URL + "?t=" + Date.now());
                 if(res.ok) {
                     const json = await res.json();
                     globalData = json || {};
                     renderWeek();
-                    
                     if(globalData['TAGS']) { myTags = globalData['TAGS']; renderTags(); }
-                    
-                    // SBLOCCO SICUREZZA
                     isDataLoaded = true;
                     document.getElementById('loadingScreen').style.display = 'none';
-                    
                     if(!silent) setStatus('Online', 'ok');
                 } else {
-                    // SE FALLISCE IL CARICAMENTO, NON SBLOCCARE
+                    // Errore server, ma sblocchiamo per permettere di scrivere
                     if(!silent) setStatus('Errore Server', 'err');
-                    // Riprova tra 3 secondi se è il primo avvio
-                    if(!isDataLoaded) setTimeout(() => loadData(false), 3000);
+                    if(!isDataLoaded) {
+                        isDataLoaded = true;
+                        document.getElementById('loadingScreen').style.display = 'none';
+                    }
                 }
             } catch(e) { 
                 if(!silent) setStatus('Offline', 'err');
-                if(!isDataLoaded) setTimeout(() => loadData(false), 3000);
+                // Se offline, sblocca comunque
+                if(!isDataLoaded) {
+                    isDataLoaded = true;
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }
             }
         }
 
         function renderWeek() {
             const key = getWeekKey();
             const d = globalData[key];
-            
-            // Helper set per evitare sfarfallio
-            const set = (id, val) => { 
-                const el = document.getElementById(id); 
-                const cleanVal = val || '';
-                if(el.innerHTML !== cleanVal) el.innerHTML = cleanVal; 
-            };
+            const set = (id, val) => { const el = document.getElementById(id); if(el.innerHTML !== (val || '')) el.innerHTML = val || ''; };
             
             if(!d) {
                 ['mon','tue','wed','thu','fri','note1','note2','note3'].forEach(id => set(id, ''));
@@ -409,11 +402,14 @@
             let start = new Date(currentMon);
             let end = new Date(currentMon); end.setDate(end.getDate() + 5);
             
-            const fetch1 = fetch(`${GCAL_1}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json());
-            const fetch2 = fetch(`${GCAL_2}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json());
-
             try {
-                const [evts1, evts2] = await Promise.all([fetch1, fetch2]);
+                const [res1, res2] = await Promise.all([
+                    fetch(`${GCAL_1}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json()).catch(e => []),
+                    fetch(`${GCAL_2}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json()).catch(e => [])
+                ]);
+
+                const evts1 = Array.isArray(res1) ? res1 : [];
+                const evts2 = Array.isArray(res2) ? res2 : [];
 
                 const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
                 for(let i=1; i<=5; i++) document.getElementById(ids[i]).innerHTML = '';
@@ -424,20 +420,15 @@
                     if(dayIdx >= 1 && dayIdx <= 5) {
                         const container = document.getElementById(ids[dayIdx]);
                         const timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                        
                         let html = '';
                         if(ev.link && ev.link.length > 5) {
                             const gearTag = isGear ? '<span class="gcal-tag">GEARXPRO</span>' : '<span style="float:right">🔗</span>';
                             const extraClass = isGear ? 'gear-event' : '';
-                            html = `<a href="${ev.link}" target="_blank" class="gcal-event ${extraClass}">
-                                <b>${timeStr}</b> ${ev.title} ${gearTag}
-                            </a>`;
+                            html = `<a href="${ev.link}" target="_blank" class="gcal-event ${extraClass}"><b>${timeStr}</b> ${ev.title} ${gearTag}</a>`;
                         } else {
                             const gearTag = isGear ? '<span class="gcal-tag">GEARXPRO</span>' : '';
                             const extraClass = isGear ? 'gear-event' : '';
-                            html = `<div class="gcal-event ${extraClass}">
-                                <b>${timeStr}</b> ${ev.title} ${gearTag}
-                            </div>`;
+                            html = `<div class="gcal-event ${extraClass}"><b>${timeStr}</b> ${ev.title} ${gearTag}</div>`;
                         }
                         container.insertAdjacentHTML('beforeend', html);
                     }
@@ -446,11 +437,14 @@
                 evts1.forEach(ev => renderEv(ev, false));
                 evts2.forEach(ev => renderEv(ev, true));
 
-            } catch(e) { console.log('GCal err', e); }
+            } catch(e) { 
+                console.log('GCal err', e);
+                // Non blocchiamo l'app se Google fallisce
+                setStatus('Err Google', 'wait');
+            }
         }
 
         function fmt(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
-        
         function renderTags() {
             const c = document.getElementById('tagsList'); c.innerHTML = '';
             myTags.forEach((t, i) => {
@@ -461,14 +455,12 @@
                 c.appendChild(el);
             });
         }
-
         function addTag() {
             const n = document.getElementById('tagName').value.toUpperCase();
             const c = document.getElementById('tagColor').value;
             if(n) { myTags.push({name:n, color:c}); renderTags(); deferredSave(); document.getElementById('tagName').value=''; }
         }
         function delTag(i) { if(confirm('Elimina?')) { myTags.splice(i,1); renderTags(); deferredSave(); } }
-
         function insertTag(name, color) {
             if(!lastFocus) lastFocus = document.getElementById('mon');
             lastFocus.focus();
@@ -478,13 +470,10 @@
             const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
-            const hasText = lastFocus.innerText.trim().length > 0;
-            const spacer = hasText ? "<br><br>" : "";
-            const html = `${spacer}<span class="client-tag" contenteditable="false" style="color:${color}; border-color:${color}; background:${color}20">${name}</span><div><br></div>`;
+            const html = `<span class="client-tag" contenteditable="false" style="color:${color}; border-color:${color}; background:${color}20">${name}</span><div><br></div>`;
             document.execCommand('insertHTML', false, html);
             deferredSave();
         }
-
         function toggleTheme() {
             const isDark = document.body.getAttribute('data-theme') === 'dark';
             const newVal = isDark ? 'light' : 'dark';
@@ -495,7 +484,6 @@
             document.getElementById('loadingScreen').style.display = 'flex';
             loadData(false); 
         }
-
     </script>
 </body>
 </html>
