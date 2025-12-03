@@ -22,9 +22,7 @@
             --border: #E5E7EB;
             --input-bg: #F9FAFB;
             
-            --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
-            --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            
+            --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
             --radius-L: 16px;
             --radius-M: 12px;
             --radius-S: 8px;
@@ -42,232 +40,82 @@
         }
 
         * { box-sizing: border-box; outline: none; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s ease; }
+
+        /* OVERLAYS (Login & Loading) */
+        .overlay { position: fixed; inset: 0; background: var(--bg-body); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: opacity 0.3s; }
+        .login-box { background: var(--bg-card); padding: 40px; border-radius: 24px; width: 340px; text-align: center; box-shadow: var(--shadow-card); border: 1px solid var(--border); }
+        .login-input { width: 100%; padding: 14px; margin: 20px 0; border: 2px solid var(--border); border-radius: 12px; background: var(--input-bg); font-size: 16px; text-align: center; color:var(--text-main); }
+        .login-btn { width: 100%; padding: 14px; background: var(--brand-black); color: #fff; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
         
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            margin: 0; padding: 0;
-            height: 100vh;
-            display: flex; flex-direction: column;
-            overflow: hidden;
-            transition: background 0.3s ease;
-        }
+        /* Loading Spinner */
+        .loader { border: 4px solid var(--border); border-top: 4px solid var(--brand-yellow); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        h1, h2, h3, .day-header, .btn-meet { font-family: 'Poppins', sans-serif; }
-
-        /* --- HEADER --- */
-        header {
-            height: 72px;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
-            z-index: 50;
-        }
-
+        /* HEADER */
+        header { height: 72px; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; flex-shrink: 0; }
         .logo-section { display: flex; align-items: center; gap: 16px; }
         .app-logo { height: 40px; object-fit: contain; }
-        
-        #syncStatus {
-            font-size: 10px; font-weight: 700; padding: 4px 10px;
-            border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
-        }
+        #syncStatus { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
         .status-ok { background: #DCFCE7; color: #166534; }
         .status-wait { background: #FEF3C7; color: #92400E; }
         .status-err { background: #FEE2E2; color: #991B1B; }
 
-        /* Navigation */
-        .week-nav {
-            display: flex; align-items: center; gap: 12px;
-            background: var(--input-bg); padding: 6px 12px;
-            border-radius: 50px; border: 1px solid var(--border);
-        }
-        .nav-btn {
-            background: var(--bg-card); border: 1px solid var(--border);
-            cursor: pointer; color: var(--text-main);
-            display: grid; place-items: center;
-            width: 32px; height: 32px; border-radius: 50%;
-            transition: 0.2s;
-        }
+        .week-nav { display: flex; align-items: center; gap: 12px; background: var(--input-bg); padding: 6px 12px; border-radius: 50px; border: 1px solid var(--border); }
+        .nav-btn { background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; color: var(--text-main); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; transition: 0.2s; }
         .nav-btn:hover { transform: scale(1.1); border-color: var(--brand-yellow); }
         .date-display { font-weight: 600; font-size: 14px; min-width: 140px; text-align: center; }
-
-        /* Right Actions */
         .header-actions { display: flex; align-items: center; gap: 12px; }
 
-        .btn-meet {
-            display: flex; align-items: center; gap: 8px;
-            background: var(--brand-yellow); color: var(--brand-black);
-            text-decoration: none; padding: 8px 16px;
-            border-radius: var(--radius-M);
-            font-weight: 600; font-size: 13px;
-            box-shadow: 0 4px 6px rgba(255, 214, 0, 0.25);
-            transition: all 0.2s ease;
-        }
-        .btn-meet:hover { transform: translateY(-2px); box-shadow: 0 6px 10px rgba(255, 214, 0, 0.4); }
-        
-        .icon-btn {
-            background: var(--input-bg); border: 1px solid var(--border);
-            color: var(--text-muted); width: 40px; height: 40px;
-            border-radius: var(--radius-M); cursor: pointer;
-            display: grid; place-items: center; transition: 0.2s;
-        }
-        .icon-btn:hover { background: var(--bg-card); color: var(--text-main); border-color: var(--text-main); }
+        .btn-meet { display: flex; align-items: center; gap: 8px; background: var(--brand-yellow); color: var(--brand-black); text-decoration: none; padding: 8px 16px; border-radius: var(--radius-M); font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(255, 214, 0, 0.25); transition: all 0.2s ease; }
+        .btn-meet:hover { transform: translateY(-2px); }
+        .icon-btn { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); width: 40px; height: 40px; border-radius: var(--radius-M); cursor: pointer; display: grid; place-items: center; transition: 0.2s; }
+        .icon-btn:hover { background: var(--bg-card); color: var(--text-main); }
 
-        /* --- TOOLBAR --- */
-        .toolbar {
-            background: var(--bg-card); padding: 10px 24px;
-            border-bottom: 1px solid var(--border);
-            display: flex; gap: 20px; align-items: center;
-        }
+        /* TOOLBAR */
+        .toolbar { background: var(--bg-card); padding: 10px 24px; border-bottom: 1px solid var(--border); display: flex; gap: 20px; align-items: center; flex-shrink: 0; }
         .tool-grp { display: flex; gap: 6px; padding-right: 20px; border-right: 1px solid var(--border); }
-        
-        .tag-inp {
-            background: var(--input-bg); border: 1px solid var(--border);
-            color: var(--text-main); padding: 8px 12px;
-            border-radius: var(--radius-S); width: 120px; font-size: 12px;
-        }
-        .btn-add-tag {
-            background: var(--brand-black); color: white;
-            border: none; padding: 0 16px; height: 34px;
-            border-radius: var(--radius-S); font-weight: 600; font-size: 11px; cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-add-tag:hover { opacity: 0.9; }
-
+        .tag-inp { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: var(--radius-S); width: 120px; font-size: 12px; }
+        .btn-add-tag { background: var(--brand-black); color: white; border: none; padding: 0 16px; height: 34px; border-radius: var(--radius-S); font-weight: 600; font-size: 11px; cursor: pointer; }
         .tags-container { display: flex; gap: 8px; flex-wrap: wrap; }
-        .tag-pill {
-            padding: 5px 10px; border-radius: 6px; font-size: 11px;
-            font-weight: 700; cursor: pointer; border: 1px solid transparent;
-            display: flex; align-items: center; gap: 6px; transition: transform 0.1s;
-        }
+        .tag-pill { padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid transparent; display: flex; align-items: center; gap: 6px; transition: transform 0.1s; }
         .tag-pill:hover { transform: translateY(-1px); }
 
-        /* --- MAIN GRID --- */
-        .main-grid {
-            display: grid; 
-            grid-template-columns: 1fr 270px;
-            gap: 24px; padding: 24px;
-            flex-grow: 1; overflow: hidden;
-        }
-
+        /* MAIN GRID */
+        .main-grid { display: grid; grid-template-columns: 1fr 270px; gap: 24px; padding: 24px; flex-grow: 1; overflow: hidden; }
         .left-col { display: flex; flex-direction: column; gap: 20px; overflow: hidden; height: 100%; }
-
-        /* GIORNI (Card Style) */
-        .days-row {
-            display: grid; grid-template-columns: repeat(5, 1fr);
-            gap: 16px; height: 85%;
-        }
-        .day-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-L);
-            display: flex; flex-direction: column;
-            overflow: hidden;
-            box-shadow: var(--shadow-card);
-            transition: box-shadow 0.3s;
-        }
-        .day-box:hover { box-shadow: var(--shadow-hover); border-color: var(--brand-yellow); }
-
-        .day-header {
-            background: linear-gradient(180deg, var(--bg-card) 0%, var(--input-bg) 100%);
-            padding: 12px; text-align: center;
-            font-size: 12px; font-weight: 700; letter-spacing: 1px;
-            border-bottom: 1px solid var(--border); color: var(--text-muted);
-        }
+        
+        .days-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; height: 85%; }
+        .day-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-L); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-card); }
+        .day-header { background: linear-gradient(180deg, var(--bg-card) 0%, var(--input-bg) 100%); padding: 12px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 1px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
         .current-day .day-header { color: var(--brand-black); background: var(--brand-yellow); border-bottom: none; }
+        .editable { padding: 16px; flex-grow: 1; outline: none; overflow-y: auto; font-size: 13px; line-height: 1.6; }
 
-        .editable {
-            padding: 16px; flex-grow: 1; outline: none;
-            overflow-y: auto; font-size: 13px; line-height: 1.6;
-        }
-
-        /* NOTE (Footer) */
-        .notes-row {
-            height: 15%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
-        }
-        .note-box {
-            background: var(--bg-card); border: 1px dashed var(--border);
-            border-radius: var(--radius-M); padding: 12px;
-            display: flex; flex-direction: column;
-        }
+        .notes-row { height: 15%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .note-box { background: var(--bg-card); border: 1px dashed var(--border); border-radius: var(--radius-M); padding: 12px; display: flex; flex-direction: column; }
         .note-box strong { font-size: 11px; color: var(--brand-yellow); text-transform: uppercase; margin-bottom: 4px; display:block; background: var(--brand-black); width: fit-content; padding: 2px 6px; border-radius: 4px;}
 
-        /* SIDEBAR (Right) */
-        .sidebar {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-L);
-            display: flex; flex-direction: column;
-            overflow: hidden;
-            box-shadow: var(--shadow-card);
-        }
-        .sidebar-header {
-            background: var(--brand-black); color: #fff;
-            padding: 14px; font-size: 13px; font-weight: 600;
-            text-align: center; letter-spacing: 0.5px;
-        }
+        .sidebar { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-L); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-card); }
+        .sidebar-header { background: var(--brand-black); color: #fff; padding: 14px; font-size: 13px; font-weight: 600; text-align: center; letter-spacing: 0.5px; }
         .sidebar-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
 
-        /* Inputs */
-        .call-row { 
-            display: grid; 
-            grid-template-columns: 1.5fr 0.8fr 0.8fr; 
-            gap: 5px; margin-bottom: 8px; 
-        }
-        .sb-input {
-            background: var(--input-bg); border: 1px solid var(--border);
-            color: var(--text-main); padding: 6px 8px; border-radius: var(--radius-S);
-            width: 100%; font-size: 11px; transition: 0.2s; 
-        }
+        .call-row { display: grid; grid-template-columns: 1.5fr 0.8fr 0.8fr; gap: 5px; margin-bottom: 8px; }
+        .sb-input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 6px 8px; border-radius: var(--radius-S); width: 100%; font-size: 11px; transition: 0.2s; }
         .sb-input:focus { border-color: var(--brand-yellow); background: var(--bg-card); }
-
         .todo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .chk {
-            width: 20px; height: 20px; border: 2px solid var(--border);
-            border-radius: 6px; cursor: pointer; flex-shrink: 0;
-            background: var(--bg-card); transition: 0.2s;
-        }
-        .chk:hover { border-color: var(--brand-yellow); }
+        .chk { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; flex-shrink: 0; background: var(--bg-card); transition: 0.2s; }
         .chk.checked { background: var(--brand-yellow); border-color: var(--brand-yellow); position: relative; }
-        .chk.checked::after {
-            content: ''; position: absolute; top: 3px; left: 6px;
-            width: 5px; height: 9px; border: solid #000;
-            border-width: 0 2px 2px 0; transform: rotate(45deg);
-        }
+        .chk.checked::after { content: ''; position: absolute; top: 3px; left: 6px; width: 5px; height: 9px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 
-        /* GOOGLE EVENTS */
         .gcal-wrapper { padding: 8px 8px 0 8px; display: flex; flex-direction: column; gap: 6px; }
         .gcal-wrapper:empty { display: none; }
-
-        a.gcal-event {
-            display: flex !important; align-items: center; width: 100%;
-            background: #FFF9C4; 
-            border-left: 3px solid var(--brand-yellow);
-            color: #000; padding: 8px 10px; border-radius: 6px;
-            font-size: 11px; text-decoration: none; cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            transition: all 0.2s; position: relative; z-index: 10;
-        }
+        a.gcal-event { display: flex !important; align-items: center; width: 100%; background: #FFF9C4; border-left: 3px solid var(--brand-yellow); color: #000; padding: 8px 10px; border-radius: 6px; font-size: 11px; text-decoration: none; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; z-index: 10; }
         a.gcal-event:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
         div.gcal-event { display: block; background: var(--input-bg); border-left: 3px solid #ccc; padding: 8px; border-radius: 6px; font-size: 11px; color: var(--text-muted); }
-        
-        /* GearXPro Tag */
         a.gcal-event.gear-event { background: #F3F4F6; border-left-color: var(--brand-black); }
         [data-theme="dark"] a.gcal-event.gear-event { background: #374151; border-left-color: #fff; color: #fff; }
-        
         .gcal-tag { font-weight: 800; font-size: 9px; background: var(--brand-black); color: white; padding: 2px 6px; border-radius: 4px; margin-left: auto; text-transform: uppercase; }
         .client-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 4px; border: 1px solid var(--border); background: var(--input-bg); }
-
-        /* Login */
-        #loginScreen { position: fixed; inset: 0; background: var(--bg-body); z-index: 9999; display: flex; justify-content: center; align-items: center; }
-        .login-box { background: var(--bg-card); padding: 40px; border-radius: 24px; width: 340px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.1); border: 1px solid var(--border); }
-        .login-input { width: 100%; padding: 14px; margin: 20px 0; border: 2px solid var(--border); border-radius: 12px; background: var(--input-bg); font-size: 16px; text-align: center; color:var(--text-main); }
-        .login-input:focus { border-color: var(--brand-yellow); }
-        .login-btn { width: 100%; padding: 14px; background: var(--brand-black); color: #fff; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
 
         @media (max-width: 1024px) {
             .main-grid { grid-template-columns: 1fr; overflow-y: auto; display: block; }
@@ -275,13 +123,14 @@
             .day-box { min-height: 200px; margin-bottom: 16px; }
             .toolbar { overflow-x: auto; padding-bottom: 15px; }
             header { padding: 0 16px; }
-            .btn-meet span { display: none; } 
+            .btn-meet span { display: none; }
         }
     </style>
 </head>
 <body data-theme="light">
 
-    <div id="loginScreen">
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen" class="overlay">
         <div class="login-box">
             <img src="logo.png" alt="Logo" style="height: 50px; margin-bottom: 20px;" onerror="this.style.display='none'; document.getElementById('txtL').style.display='block'">
             <div id="txtL" style="display:none; font-weight:900; font-size:24px; margin-bottom:20px;">CALL<span style="color:var(--brand-yellow)">FORUS</span></div>
@@ -289,6 +138,12 @@
             <button class="login-btn" onclick="tryLogin()">ACCEDI</button>
             <p id="loginError" style="color:#EF4444; font-size:12px; margin-top:15px; display:none; font-weight:600">Password errata</p>
         </div>
+    </div>
+
+    <!-- LOADING SCREEN (Blocca input finché non scarica i dati) -->
+    <div id="loadingScreen" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px);">
+        <div class="loader"></div>
+        <div style="font-weight:700; color:#fff;">Sincronizzazione in corso...</div>
     </div>
 
     <div id="appContent" style="display:none; flex-direction: column; height: 100%;">
@@ -365,6 +220,7 @@
         let myTags = [];
         let saveTimer;
         let lastFocus = null;
+        let isDataLoaded = false; // FLAG DI SICUREZZA
 
         function getRealMonday() {
             const d = new Date();
@@ -394,17 +250,22 @@
         function initApp() {
             document.getElementById('loginScreen').style.display='none';
             document.getElementById('appContent').style.display='flex';
+            
+            // MOSTRA LOADING E BLOCCA TUTTO
+            document.getElementById('loadingScreen').style.display = 'flex';
+
             renderSidebarStructure();
             document.addEventListener('focusin', e => { if(e.target.isContentEditable) lastFocus = e.target; });
             document.addEventListener('input', e => { if(e.target.matches('[contenteditable], input')) deferredSave(); });
             
-            // Sync 5 min
             setInterval(() => loadData(true), 300000); 
             
             if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
             updateDateDisplay();
             highlightToday();
-            loadData(); 
+            
+            // CARICA E SBLOCCA SOLO SE SUCCESSO
+            loadData(false);
         }
 
         function renderSidebarStructure() {
@@ -430,9 +291,11 @@
 
         async function changeWeek(dir) {
             await saveData(true); 
+            // Mostra loading mentre cambia
+            document.getElementById('loadingScreen').style.display = 'flex';
             currentMon.setDate(currentMon.getDate() + (dir * 7));
             updateDateDisplay();
-            loadData();
+            loadData(false);
         }
 
         function setStatus(msg, type) {
@@ -442,13 +305,18 @@
         }
 
         function deferredSave() {
+            // NON SALVARE SE I DATI NON SONO STATI CARICATI
+            if (!isDataLoaded) return;
+
             setStatus('Salvataggio...', 'wait');
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => saveData(), 2000);
         }
 
         async function saveData(immediate) {
+            if (!isDataLoaded) return; // STOP SICUREZZA
             if(immediate) clearTimeout(saveTimer);
+            
             const key = getWeekKey();
             const sbInputs = Array.from(document.querySelectorAll('.sb-input')).map(i => i.value);
             const sbChecks = Array.from(document.querySelectorAll('.chk')).map(c => c.classList.contains('checked'));
@@ -469,7 +337,6 @@
             globalData['TAGS'] = myTags; 
 
             try {
-                // Fetch modificata per GitHub (referrerPolicy e mode)
                 await fetch(PANTRY_URL, { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
@@ -478,13 +345,12 @@
                     mode: 'cors'
                 });
                 setStatus('Salvato', 'ok');
-            } catch(e) { setStatus('Errore', 'err'); console.log(e); }
+            } catch(e) { setStatus('Errore', 'err'); }
         }
 
         async function loadData(silent) {
             if(!silent) setStatus('Sync...', 'wait');
             try {
-                // Fetch modificata per GitHub
                 const res = await fetch(PANTRY_URL + "?t=" + Date.now(), {
                     referrerPolicy: 'no-referrer',
                     mode: 'cors'
@@ -494,16 +360,36 @@
                     const json = await res.json();
                     globalData = json || {};
                     renderWeek();
+                    
                     if(globalData['TAGS']) { myTags = globalData['TAGS']; renderTags(); }
+                    
+                    // SBLOCCO SICUREZZA
+                    isDataLoaded = true;
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    
                     if(!silent) setStatus('Online', 'ok');
+                } else {
+                    // SE FALLISCE IL CARICAMENTO, NON SBLOCCARE
+                    if(!silent) setStatus('Errore Server', 'err');
+                    // Riprova tra 3 secondi se è il primo avvio
+                    if(!isDataLoaded) setTimeout(() => loadData(false), 3000);
                 }
-            } catch(e) { if(!silent) setStatus('Offline', 'err'); }
+            } catch(e) { 
+                if(!silent) setStatus('Offline', 'err');
+                if(!isDataLoaded) setTimeout(() => loadData(false), 3000);
+            }
         }
 
         function renderWeek() {
             const key = getWeekKey();
             const d = globalData[key];
-            const set = (id, val) => { const el = document.getElementById(id); if(el.innerHTML !== (val || '')) el.innerHTML = val || ''; };
+            
+            // Helper set per evitare sfarfallio
+            const set = (id, val) => { 
+                const el = document.getElementById(id); 
+                const cleanVal = val || '';
+                if(el.innerHTML !== cleanVal) el.innerHTML = cleanVal; 
+            };
             
             if(!d) {
                 ['mon','tue','wed','thu','fri','note1','note2','note3'].forEach(id => set(id, ''));
@@ -605,7 +491,10 @@
             document.body.setAttribute('data-theme', newVal);
             localStorage.setItem('theme', newVal);
         }
-        function forceSync() { loadData(); }
+        function forceSync() { 
+            document.getElementById('loadingScreen').style.display = 'flex';
+            loadData(false); 
+        }
 
     </script>
 </body>
