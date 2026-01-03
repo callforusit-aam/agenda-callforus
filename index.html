@@ -3,499 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CallForUs | Dashboard</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <title>CallForUs | Manager</title>
+    <!-- CSS v34 -->
+    <link rel="stylesheet" href="style.css?v=34"> 
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-    
-    <style>
-        /* --- DESIGN SYSTEM --- */
-        :root {
-            --brand-yellow: #FFD600;
-            --brand-black: #111111;
-            
-            /* LIGHT MODE */
-            --bg-body: #F0F2F5; 
-            --bg-card: #FFFFFF;
-            --text-main: #1F2937;
-            --text-muted: #6B7280;
-            --border: #E5E7EB;
-            --input-bg: #F9FAFB;
-            
-            --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
-            --radius-L: 16px;
-            --radius-M: 12px;
-            --radius-S: 8px;
-        }
-
-        /* DARK MODE */
-        [data-theme="dark"] {
-            --bg-body: #0B1120;     
-            --bg-card: #1E293B;     
-            --text-main: #F8FAFC;
-            --text-muted: #94A3B8;
-            --border: #334155;
-            --input-bg: #0F172A;
-            --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-        }
-
-        * { box-sizing: border-box; outline: none; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s ease; }
-
-        /* OVERLAYS */
-        .overlay { position: fixed; inset: 0; background: var(--bg-body); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; }
-        .login-box { background: var(--bg-card); padding: 40px; border-radius: 24px; width: 340px; text-align: center; box-shadow: var(--shadow-card); border: 1px solid var(--border); }
-        .login-input { width: 100%; padding: 14px; margin: 20px 0; border: 2px solid var(--border); border-radius: 12px; background: var(--input-bg); font-size: 16px; text-align: center; color:var(--text-main); }
-        .login-btn { width: 100%; padding: 14px; background: var(--brand-black); color: #fff; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
-        
-        .loader { border: 4px solid var(--border); border-top: 4px solid var(--brand-yellow); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* HEADER */
-        header { height: 72px; background: var(--bg-card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; flex-shrink: 0; }
-        .logo-section { display: flex; align-items: center; gap: 16px; }
-        .app-logo { height: 40px; object-fit: contain; }
-        #syncStatus { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .status-ok { background: #DCFCE7; color: #166534; }
-        .status-wait { background: #FEF3C7; color: #92400E; }
-        .status-err { background: #FEE2E2; color: #991B1B; }
-
-        .week-nav { display: flex; align-items: center; gap: 12px; background: var(--input-bg); padding: 6px 12px; border-radius: 50px; border: 1px solid var(--border); }
-        .nav-btn { background: var(--bg-card); border: 1px solid var(--border); cursor: pointer; color: var(--text-main); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; transition: 0.2s; }
-        .nav-btn:hover { transform: scale(1.1); border-color: var(--brand-yellow); }
-        .date-display { font-weight: 600; font-size: 14px; min-width: 140px; text-align: center; }
-        .header-actions { display: flex; align-items: center; gap: 12px; }
-
-        /* PULSANTI */
-        .btn-meet { display: flex; align-items: center; gap: 8px; background: var(--brand-yellow); color: var(--brand-black); text-decoration: none; padding: 8px 16px; border-radius: var(--radius-M); font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(255, 214, 0, 0.25); transition: all 0.2s ease; }
-        .btn-meet:hover { transform: translateY(-2px); }
-        
-        .btn-manual-save { display: flex; align-items: center; gap: 6px; background: #10B981; color: white; border: none; padding: 8px 16px; border-radius: var(--radius-M); font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
-        .btn-manual-save:hover { background: #059669; transform: translateY(-2px); }
-        .btn-manual-save:active { transform: scale(0.95); }
-
-        .icon-btn { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-muted); width: 40px; height: 40px; border-radius: var(--radius-M); cursor: pointer; display: grid; place-items: center; transition: 0.2s; }
-        .icon-btn:hover { background: var(--bg-card); color: var(--text-main); }
-
-        /* TOOLBAR */
-        .toolbar { background: var(--bg-card); padding: 10px 24px; border-bottom: 1px solid var(--border); display: flex; gap: 20px; align-items: center; flex-shrink: 0; }
-        .tool-grp { display: flex; gap: 6px; padding-right: 20px; border-right: 1px solid var(--border); }
-        .tag-inp { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 8px 12px; border-radius: var(--radius-S); width: 120px; font-size: 12px; }
-        .btn-add-tag { background: var(--brand-black); color: white; border: none; padding: 0 16px; height: 34px; border-radius: var(--radius-S); font-weight: 600; font-size: 11px; cursor: pointer; }
-        .tags-container { display: flex; gap: 8px; flex-wrap: wrap; }
-        .tag-pill { padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid transparent; display: flex; align-items: center; gap: 6px; transition: transform 0.1s; }
-        .tag-pill:hover { transform: translateY(-1px); }
-
-        /* MAIN GRID */
-        .main-grid { display: grid; grid-template-columns: 1fr 270px; gap: 24px; padding: 24px; flex-grow: 1; overflow: hidden; }
-        .left-col { display: flex; flex-direction: column; gap: 20px; overflow: hidden; height: 100%; }
-        
-        .days-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; height: 85%; }
-        .day-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-L); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-card); }
-        .day-header { background: linear-gradient(180deg, var(--bg-card) 0%, var(--input-bg) 100%); padding: 12px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 1px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
-        .current-day .day-header { color: var(--brand-black); background: var(--brand-yellow); border-bottom: none; }
-        .editable { padding: 16px; flex-grow: 1; outline: none; overflow-y: auto; font-size: 13px; line-height: 1.6; }
-
-        .notes-row { height: 15%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .note-box { background: var(--bg-card); border: 1px dashed var(--border); border-radius: var(--radius-M); padding: 12px; display: flex; flex-direction: column; }
-        .note-box strong { font-size: 11px; color: var(--brand-yellow); text-transform: uppercase; margin-bottom: 4px; display:block; background: var(--brand-black); width: fit-content; padding: 2px 6px; border-radius: 4px;}
-
-        .sidebar { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-L); display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-card); }
-        .sidebar-header { background: var(--brand-black); color: #fff; padding: 14px; font-size: 13px; font-weight: 600; text-align: center; letter-spacing: 0.5px; }
-        .sidebar-body { padding: 16px; overflow-y: auto; flex-grow: 1; }
-
-        .call-row { display: grid; grid-template-columns: 1.5fr 0.8fr 0.8fr; gap: 5px; margin-bottom: 8px; }
-        .sb-input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 6px 8px; border-radius: var(--radius-S); width: 100%; font-size: 11px; transition: 0.2s; }
-        .sb-input:focus { border-color: var(--brand-yellow); background: var(--bg-card); }
-        .todo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .chk { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; flex-shrink: 0; background: var(--bg-card); transition: 0.2s; }
-        .chk.checked { background: var(--brand-yellow); border-color: var(--brand-yellow); position: relative; }
-        .chk.checked::after { content: ''; position: absolute; top: 3px; left: 6px; width: 5px; height: 9px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-
-        /* GOOGLE EVENTS */
-        .gcal-wrapper { padding: 8px 8px 0 8px; display: flex; flex-direction: column; gap: 6px; }
-        .gcal-wrapper:empty { display: none; }
-        a.gcal-event { display: flex !important; align-items: center; width: 100%; background: #FFF9C4; border-left: 3px solid var(--brand-yellow); color: #000; padding: 8px 10px; border-radius: 6px; font-size: 11px; text-decoration: none; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; position: relative; z-index: 10; margin-bottom: 4px; }
-        a.gcal-event:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        div.gcal-event { display: block; background: var(--input-bg); border-left: 3px solid #ccc; padding: 8px; border-radius: 6px; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-        a.gcal-event.gear-event { background: #F3F4F6; border-left-color: var(--brand-black); }
-        [data-theme="dark"] a.gcal-event.gear-event { background: #374151; border-left-color: #fff; color: #fff; }
-        .gcal-tag { font-weight: 800; font-size: 9px; background: var(--brand-black); color: white; padding: 2px 6px; border-radius: 4px; margin-left: auto; text-transform: uppercase; }
-        .client-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 4px; border: 1px solid var(--border); background: var(--input-bg); }
-
-        @media (max-width: 1024px) {
-            .main-grid { grid-template-columns: 1fr; overflow-y: auto; display: block; }
-            .days-row { display: flex; flex-direction: column; height: auto; margin-bottom: 24px; }
-            .day-box { min-height: 200px; margin-bottom: 16px; }
-            .toolbar { overflow-x: auto; padding-bottom: 15px; }
-            header { padding: 0 16px; }
-            .btn-meet span { display: none; }
-        }
-    </style>
 </head>
 <body data-theme="light">
 
     <!-- LOGIN -->
     <div id="loginScreen" class="overlay">
         <div class="login-box">
-            <img src="logo.png" alt="Logo" style="height: 50px; margin-bottom: 20px;" onerror="this.style.display='none'; document.getElementById('txtL').style.display='block'">
-            <div id="txtL" style="display:none; font-weight:900; font-size:24px; margin-bottom:20px;">CALL<span style="color:var(--brand-yellow)">FORUS</span></div>
+            <img src="logo.png" alt="Logo" style="height:60px; margin-bottom:20px;" onerror="this.style.display='none'">
+            <h2 style="margin-bottom:20px;">Accesso</h2>
             <input type="password" id="passwordInput" class="login-input" placeholder="Password">
-            <button class="login-btn" onclick="tryLogin()">ACCEDI</button>
-            <p id="loginError" style="color:#EF4444; font-size:12px; margin-top:15px; display:none; font-weight:600">Password errata</p>
+            <button class="btn-primary" onclick="tryLogin()" style="width:100%; justify-content:center;">ENTRA</button>
+            <p id="loginError" style="color:red; display:none; margin-top:10px;">Errata</p>
         </div>
     </div>
 
     <!-- LOADING -->
-    <div id="loadingScreen" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px);">
+    <div id="loadingScreen" class="overlay" style="display:none; background:rgba(255,255,255,0.9);">
         <div class="loader"></div>
-        <div style="font-weight:700; color:#fff;">Sincronizzazione in corso...</div>
+        <p style="margin-top:20px; font-weight:600; color:#333">Sincronizzazione...</p>
     </div>
 
-    <div id="appContent" style="display:none; flex-direction: column; height: 100%;">
-        <header>
-            <div class="logo-section">
-                <img src="logo.png" alt="Logo" class="app-logo" onerror="this.style.display='none';">
-                <div id="syncStatus" class="status-ok">Pronto</div>
+    <!-- MODALE AGGIUNTA GRUPPO ATTIVITÀ -->
+    <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:200;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Nuovo Gruppo Attività</h3>
+                <span class="material-icons-round close-btn" onclick="closeModal()">close</span>
             </div>
             
-            <div class="week-nav">
-                <button class="nav-btn" onclick="changeWeek(-1)"><span class="material-icons-round">chevron_left</span></button>
-                <div class="date-display" id="dateDisplay">...</div>
-                <button class="nav-btn" onclick="changeWeek(1)"><span class="material-icons-round">chevron_right</span></button>
+            <div class="form-group">
+                <label>Giorno</label>
+                <select id="formDay" class="modal-select">
+                    <option value="mon">Lunedì</option>
+                    <option value="tue">Martedì</option>
+                    <option value="wed">Mercoledì</option>
+                    <option value="thu">Giovedì</option>
+                    <option value="fri">Venerdì</option>
+                </select>
             </div>
 
-            <div class="header-actions">
-                <!-- PULSANTE SALVA MANUALE (NUOVO) -->
-                <button class="btn-manual-save" onclick="manualSave()">
-                    <span class="material-icons-round">save</span>
-                    SALVA ORA
+            <div class="form-group">
+                <label>Azienda</label>
+                <select id="formCompany" class="modal-select"></select>
+                <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">(Crea aziende dalla toolbar qui sotto)</p>
+            </div>
+
+            <div class="form-group">
+                <label>Attività (una per riga)</label>
+                <textarea id="formTasks" class="modal-textarea" rows="6" placeholder="- Task 1&#10;- Task 2"></textarea>
+            </div>
+
+            <button class="btn-primary" onclick="saveFromForm()" style="width:100%; justify-content:center; margin-top:10px;">INSERISCI</button>
+        </div>
+    </div>
+
+    <div id="app" style="display:none;">
+        
+        <!-- SIDEBAR -->
+        <nav class="sidebar">
+            <div class="logo-icon">H</div>
+            <div class="menu">
+                <button class="menu-item active" onclick="nav('home')" title="Home"><span class="material-icons-round">dashboard</span></button>
+                <button class="menu-item" onclick="nav('calendar')" title="Calendario"><span class="material-icons-round">calendar_today</span></button>
+                <button class="menu-item" onclick="nav('account')" title="Account"><span class="material-icons-round">bar_chart</span></button>
+                <button class="menu-item" onclick="nav('notes')" title="Note"><span class="material-icons-round">folder_open</span></button>
+            </div>
+            <div style="margin-top:auto">
+                <button class="menu-item" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
+            </div>
+        </nav>
+
+        <main>
+            <header>
+                <div class="header-title">
+                    <h2 id="pageTitle">Dashboard</h2>
+                    <div class="date-info">
+                        <span id="currentDayLabel" class="today-label">...</span>
+                        <span id="currentWeekRange" class="week-label">...</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div id="syncStatus" class="status-badge status-ok">Sync...</div>
+                    <button class="icon-btn" onclick="manualSave()" title="Salva"><span class="material-icons-round">save</span></button>
+                    <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
+                    <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-primary">
+                        <span class="material-icons-round">add_circle</span> Organizza Call
+                    </a>
+                </div>
+            </header>
+
+            <!-- TOOLBAR -->
+            <div class="toolbar" id="mainToolbar" style="display:none;">
+                <button class="btn-primary" onclick="openActivityModal()" style="margin-right:20px; background:var(--text-main); color:var(--bg-card); border:1px solid var(--border);">
+                    <span class="material-icons-round">playlist_add</span> Gruppo
                 </button>
 
-                <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-meet">
-                    <span class="material-icons-round">calendar_today</span>
-                    Organizza Call
-                </a>
-                <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">sync</span></button>
-                <button class="icon-btn" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
-            </div>
-        </header>
-
-        <div class="toolbar">
-            <div class="tool-grp">
-                <button class="icon-btn" onclick="fmt('bold')"><span class="material-icons-round">format_bold</span></button>
-                <button class="icon-btn" onclick="fmt('italic')"><span class="material-icons-round">format_italic</span></button>
-                <button class="icon-btn" onclick="fmt('strikeThrough')" style="color:#EF4444"><span class="material-icons-round">strikethrough_s</span></button>
-                <button class="icon-btn" onclick="fmt('removeFormat')"><span class="material-icons-round">format_clear</span></button>
-            </div>
-            <div class="tool-grp" style="border:none">
-                <input type="color" id="tagColor" value="#FFD600" style="width:30px; height:30px; border:none; background:none; cursor:pointer">
-                <input type="text" id="tagName" class="tag-inp" placeholder="NUOVO TAG">
-                <button class="btn-add-tag" onclick="addTag()">AGGIUNGI</button>
-            </div>
-            <div class="tags-container" id="tagsList"></div>
-        </div>
-
-        <div class="main-grid">
-            <div class="left-col">
-                <div class="days-row">
-                    <div class="day-box" id="box-1"><div class="day-header">LUNEDÌ</div><div class="gcal-wrapper" id="mon-gcal"></div><div class="editable" contenteditable="true" id="mon"></div></div>
-                    <div class="day-box" id="box-2"><div class="day-header">MARTEDÌ</div><div class="gcal-wrapper" id="tue-gcal"></div><div class="editable" contenteditable="true" id="tue"></div></div>
-                    <div class="day-box" id="box-3"><div class="day-header">MERCOLEDÌ</div><div class="gcal-wrapper" id="wed-gcal"></div><div class="editable" contenteditable="true" id="wed"></div></div>
-                    <div class="day-box" id="box-4"><div class="day-header">GIOVEDÌ</div><div class="gcal-wrapper" id="thu-gcal"></div><div class="editable" contenteditable="true" id="thu"></div></div>
-                    <div class="day-box" id="box-5"><div class="day-header">VENERDÌ</div><div class="gcal-wrapper" id="fri-gcal"></div><div class="editable" contenteditable="true" id="fri"></div></div>
+                <!-- Gestione Aziende -->
+                <div class="company-creator">
+                    <input type="color" id="newCompColor" value="#000000" title="Colore Azienda">
+                    <input type="text" id="newCompName" placeholder="NUOVA AZIENDA">
+                    <button class="btn-icon-small" onclick="addNewCompany()"><span class="material-icons-round">add</span></button>
                 </div>
-                <div class="notes-row">
-                    <div class="note-box"><strong contenteditable="true">NOTE 1</strong><div class="editable" contenteditable="true" id="note1"></div></div>
-                    <div class="note-box"><strong contenteditable="true">NOTE 2</strong><div class="editable" contenteditable="true" id="note2"></div></div>
-                    <div class="note-box"><strong contenteditable="true">NOTE 3</strong><div class="editable" contenteditable="true" id="note3"></div></div>
+                <div id="companyTagsContainer" style="display:none;"></div> 
+            </div>
+
+            <!-- 1. PAGINA HOME -->
+            <div id="page-home" class="page active">
+                <div class="dashboard-grid">
+                    
+                    <div class="card focus-card">
+                        <div class="card-header">
+                            <h3>Attività di Oggi</h3>
+                            <button class="icon-btn" onclick="nav('calendar')" style="width:30px; height:30px;"><span class="material-icons-round" style="font-size:16px">edit</span></button>
+                        </div>
+                        <div class="card-body" id="home-tasks" style="padding-right:5px; overflow-y:auto;"></div>
+                    </div>
+
+                    <div class="card call-card">
+                        <div class="card-header">
+                            <h3>Prossima Call</h3>
+                            <span class="status-badge status-wait">G-Meet</span>
+                        </div>
+                        <div class="card-body" id="home-calls"></div>
+                    </div>
+
+                    <div class="card mail-card">
+                        <div class="card-header"><h3>Posta</h3></div>
+                        <div class="card-body scrollable" id="mail-list-container"></div>
+                        <a href="https://mail.google.com" target="_blank" class="btn-secondary" style="margin-top:10px;">Apri Gmail</a>
+                    </div>
+
+                    <div class="card docs-card">
+                        <div class="card-header"><h3>Docs</h3></div>
+                        <div class="card-body scrollable" id="docs-list"></div>
+                        <a href="https://drive.google.com" target="_blank" class="btn-secondary" style="margin-top:10px;">Apri Drive</a>
+                    </div>
+
+                    <div class="card input-card">
+                        <div class="card-header"><h3>Note Veloci</h3></div>
+                        <textarea id="home-quick-notes" placeholder="Scrivi appunti..." oninput="saveData()"></textarea>
+                    </div>
                 </div>
             </div>
 
-            <div class="sidebar">
-                <div class="sidebar-header">CALL DELLA SETTIMANA</div>
-                <div class="sidebar-body" id="callList"></div>
-                <div class="sidebar-header">ATTIVITÀ DA FISSARE</div>
-                <div class="sidebar-body" id="todoList"></div>
+            <!-- 2. PAGINA CALENDARIO -->
+            <div id="page-calendar" class="page">
+                <div class="calendar-layout-wide">
+                    <div class="cal-days-grid" id="calendar-days"></div>
+                    <div class="cal-nav-bottom">
+                        <button class="icon-btn" onclick="changeWeek(-1)"><span class="material-icons-round">chevron_left</span></button>
+                        <span id="calDateDisplay" style="font-weight:600; font-size:14px; min-width:150px; text-align:center;">...</span>
+                        <button class="icon-btn" onclick="changeWeek(1)"><span class="material-icons-round">chevron_right</span></button>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- 3. PAGINA ACCOUNT -->
+            <div id="page-account" class="page">
+                <div class="account-grid">
+                    <div class="card" style="text-align:center;">
+                        <h3>Vendite Oggi</h3>
+                        <div class="big-num" contenteditable="true" id="stat-sales" oninput="saveData()">€ 0,00</div>
+                    </div>
+                    <div class="card" style="text-align:center;">
+                        <h3>Unità Vendute</h3>
+                        <div class="big-num" contenteditable="true" id="stat-units" oninput="saveData()">0</div>
+                    </div>
+                    <div class="card" style="grid-column:1/-1; min-height:400px;">
+                        <div class="card-header"><h3>Note Performance</h3></div>
+                        <div id="account-notes" contenteditable="true" style="height:100%; outline:none;" oninput="saveData()"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. PAGINA NOTE -->
+            <div id="page-notes" class="page">
+                <div class="card" style="height:100%">
+                    <div class="card-header"><h3>Blocco Note Generale</h3></div>
+                    <div id="general-notes" contenteditable="true" style="height:100%; outline:none; font-size:14px; line-height:1.6;" oninput="saveData()"></div>
+                </div>
+            </div>
+
+        </main>
     </div>
-
-    <script>
-        const PWD = "giuseppe90";
-        const PANTRY_URL = "https://getpantry.cloud/apiv1/pantry/e39b701d-95a9-48c0-ae96-d13b53856c94/basket/Dashboard";
-        const GCAL_1 = "https://script.google.com/macros/s/AKfycbwQd1ocRZroEaEKw08JQEQ89owrJnN1e4WKpctx449s1mDxUZN7ObtQzTzBVLb3W4NB/exec";
-        const GCAL_2 = "https://script.google.com/macros/s/AKfycbz40zr-5GS7zX9ZPK3HlSpp5TCWyLzhU0RnFRccUvUTDZ44SaKxct_MFKnCNo571nZN/exec";
-
-        let currentMon = getRealMonday();
-        let globalData = {};
-        let myTags = [];
-        let saveTimer;
-        let lastFocus = null;
-        let isDataLoaded = false;
-
-        function getRealMonday() {
-            const d = new Date();
-            const day = d.getDay(); 
-            const diff = d.getDate() - day + (day == 0 ? -6 : 1);
-            const mon = new Date(d);
-            mon.setDate(diff);
-            mon.setHours(0,0,0,0);
-            return mon;
-        }
-
-        function highlightToday() {
-            const today = new Date().getDay(); 
-            if(today >= 1 && today <= 5) {
-                document.getElementById(`box-${today}`).classList.add('current-day');
-            }
-        }
-
-        function tryLogin() {
-            if(document.getElementById('passwordInput').value === PWD) {
-                localStorage.setItem('auth', '1');
-                initApp();
-            } else { document.getElementById('loginError').style.display='block'; }
-        }
-        if(localStorage.getItem('auth')==='1') initApp();
-
-        function initApp() {
-            document.getElementById('loginScreen').style.display='none';
-            document.getElementById('appContent').style.display='flex';
-            
-            // Timeout sicurezza
-            document.getElementById('loadingScreen').style.display = 'flex';
-            setTimeout(() => {
-                if(!isDataLoaded) {
-                    document.getElementById('loadingScreen').style.display = 'none';
-                    isDataLoaded = true; 
-                    setStatus('Offline/Errore', 'err');
-                }
-            }, 3000);
-
-            renderSidebarStructure();
-            document.addEventListener('focusin', e => { if(e.target.isContentEditable) lastFocus = e.target; });
-            document.addEventListener('input', e => { if(e.target.matches('[contenteditable], input')) deferredSave(); });
-            
-            // SYNC 5 Minuti
-            setInterval(() => loadData(true), 300000); 
-            
-            if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
-            updateDateDisplay();
-            highlightToday();
-            loadData(false);
-        }
-
-        function renderSidebarStructure() {
-            const callList = document.getElementById('callList');
-            if(!callList.innerHTML.trim()) {
-                let html = "";
-                for(let i=0; i<8; i++) html += `<div class="call-row"><input class="sb-input" placeholder="Cliente"><input class="sb-input" placeholder="Giorno"><input class="sb-input" placeholder="Ora"></div>`;
-                callList.innerHTML = html;
-            }
-            const todoList = document.getElementById('todoList');
-            if(!todoList.innerHTML.trim()) {
-                let html = "";
-                for(let i=0; i<12; i++) html += `<div class="todo-row"><div class="chk" onclick="this.classList.toggle('checked'); deferredSave()"></div><input class="sb-input" placeholder="Attività..." oninput="deferredSave()"></div>`;
-                todoList.innerHTML = html;
-            }
-        }
-
-        function getWeekKey() { return "W_" + currentMon.toISOString().split('T')[0]; }
-        function updateDateDisplay() {
-            let sun = new Date(currentMon); sun.setDate(currentMon.getDate() + 6);
-            document.getElementById('dateDisplay').innerText = `${currentMon.getDate()}/${currentMon.getMonth()+1} - ${sun.getDate()}/${sun.getMonth()+1}`;
-        }
-
-        async function changeWeek(dir) {
-            await saveData(true); 
-            document.getElementById('loadingScreen').style.display = 'flex';
-            currentMon.setDate(currentMon.getDate() + (dir * 7));
-            updateDateDisplay();
-            loadData(false);
-        }
-
-        function setStatus(msg, type) {
-            const el = document.getElementById('syncStatus');
-            el.innerText = msg;
-            el.className = type === 'ok' ? 'status-ok' : (type === 'wait' ? 'status-wait' : 'status-err');
-        }
-
-        function deferredSave() {
-            if (!isDataLoaded) return;
-            setStatus('In attesa...', 'wait');
-            clearTimeout(saveTimer);
-            saveTimer = setTimeout(() => saveData(), 3000); // Ritardo aumentato a 3s
-        }
-
-        function manualSave() {
-            saveData(true);
-        }
-
-        async function saveData(immediate) {
-            if (!isDataLoaded) return;
-            if(immediate) clearTimeout(saveTimer);
-            
-            setStatus('Salvataggio...', 'wait');
-            
-            const key = getWeekKey();
-            const sbInputs = Array.from(document.querySelectorAll('.sb-input')).map(i => i.value);
-            const sbChecks = Array.from(document.querySelectorAll('.chk')).map(c => c.classList.contains('checked'));
-
-            const weekData = {
-                mon: document.getElementById('mon').innerHTML, 
-                tue: document.getElementById('tue').innerHTML, 
-                wed: document.getElementById('wed').innerHTML,
-                thu: document.getElementById('thu').innerHTML, 
-                fri: document.getElementById('fri').innerHTML,
-                n1: document.getElementById('note1').innerHTML,
-                n2: document.getElementById('note2').innerHTML,
-                n3: document.getElementById('note3').innerHTML,
-                sbInp: sbInputs, sbChk: sbChecks
-            };
-
-            globalData[key] = weekData;
-            globalData['TAGS'] = myTags; 
-
-            try {
-                await fetch(PANTRY_URL, { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify(globalData)
-                });
-                setStatus('Salvato', 'ok');
-            } catch(e) { 
-                setStatus('Errore Save', 'err'); 
-                console.error(e);
-            }
-        }
-
-        async function loadData(silent) {
-            if(!silent) setStatus('Sync...', 'wait');
-            try {
-                const res = await fetch(PANTRY_URL + "?t=" + Date.now());
-                if(res.ok) {
-                    const json = await res.json();
-                    globalData = json || {};
-                    renderWeek();
-                    if(globalData['TAGS']) { myTags = globalData['TAGS']; renderTags(); }
-                    isDataLoaded = true;
-                    document.getElementById('loadingScreen').style.display = 'none';
-                    if(!silent) setStatus('Online', 'ok');
-                } else {
-                    if(!silent) setStatus('Errore Server', 'err');
-                    if(!isDataLoaded) { isDataLoaded = true; document.getElementById('loadingScreen').style.display = 'none'; }
-                }
-            } catch(e) { 
-                if(!silent) setStatus('Offline', 'err');
-                if(!isDataLoaded) { isDataLoaded = true; document.getElementById('loadingScreen').style.display = 'none'; }
-            }
-        }
-
-        function renderWeek() {
-            const key = getWeekKey();
-            const d = globalData[key];
-            const set = (id, val) => { const el = document.getElementById(id); const cleanVal = val || ''; if(el.innerHTML !== cleanVal) el.innerHTML = cleanVal; };
-            
-            if(!d) {
-                ['mon','tue','wed','thu','fri','note1','note2','note3'].forEach(id => set(id, ''));
-                document.querySelectorAll('.sb-input').forEach(el => el.value = '');
-                document.querySelectorAll('.chk').forEach(el => el.classList.remove('checked'));
-            } else {
-                set('mon', d.mon); set('tue', d.tue); set('wed', d.wed);
-                set('thu', d.thu); set('fri', d.fri);
-                set('note1', d.n1); set('note2', d.n2); set('note3', d.n3);
-                if(d.sbInp) document.querySelectorAll('.sb-input').forEach((el, i) => { if(el.value !== (d.sbInp[i] || '')) el.value = d.sbInp[i] || ''; });
-                if(d.sbChk) document.querySelectorAll('.chk').forEach((el, i) => { if(d.sbChk[i]) el.classList.add('checked'); else el.classList.remove('checked'); });
-            }
-            fetchGoogle();
-        }
-
-        async function fetchGoogle() {
-            let start = new Date(currentMon);
-            let end = new Date(currentMon); end.setDate(end.getDate() + 5);
-            
-            try {
-                const [res1, res2] = await Promise.all([
-                    fetch(`${GCAL_1}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json()).catch(e => []),
-                    fetch(`${GCAL_2}?start=${start.toISOString()}&end=${end.toISOString()}`).then(r => r.json()).catch(e => [])
-                ]);
-
-                const evts1 = Array.isArray(res1) ? res1 : [];
-                const evts2 = Array.isArray(res2) ? res2 : [];
-
-                const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-                for(let i=1; i<=5; i++) document.getElementById(ids[i]).innerHTML = '';
-
-                const renderEv = (ev, isGear) => {
-                    const d = new Date(ev.startTime);
-                    const dayIdx = d.getDay();
-                    if(dayIdx >= 1 && dayIdx <= 5) {
-                        const container = document.getElementById(ids[dayIdx]);
-                        const timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                        let html = '';
-                        if(ev.link && ev.link.length > 5) {
-                            const gearTag = isGear ? '<span class="gcal-tag">GEARXPRO</span>' : '<span style="float:right">🔗</span>';
-                            const extraClass = isGear ? 'gear-event' : '';
-                            html = `<a href="${ev.link}" target="_blank" class="gcal-event ${extraClass}"><b>${timeStr}</b> ${ev.title} ${gearTag}</a>`;
-                        } else {
-                            const gearTag = isGear ? '<span class="gcal-tag">GEARXPRO</span>' : '';
-                            const extraClass = isGear ? 'gear-event' : '';
-                            html = `<div class="gcal-event ${extraClass}"><b>${timeStr}</b> ${ev.title} ${gearTag}</div>`;
-                        }
-                        container.insertAdjacentHTML('beforeend', html);
-                    }
-                };
-
-                evts1.forEach(ev => renderEv(ev, false));
-                evts2.forEach(ev => renderEv(ev, true));
-
-            } catch(e) { 
-                console.log('GCal err', e);
-                setStatus('Err Google', 'wait');
-            }
-        }
-
-        function fmt(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
-        function renderTags() {
-            const c = document.getElementById('tagsList'); c.innerHTML = '';
-            myTags.forEach((t, i) => {
-                const el = document.createElement('div');
-                el.className = 'tag-pill';
-                el.style.background = t.color + '25'; el.style.color = t.color; el.style.borderColor = t.color;
-                el.innerHTML = `<span onclick="insertTag('${t.name}', '${t.color}')">${t.name}</span> <span style="opacity:0.5; margin-left:4px" onclick="delTag(${i})">✕</span>`;
-                c.appendChild(el);
-            });
-        }
-        function addTag() {
-            const n = document.getElementById('tagName').value.toUpperCase();
-            const c = document.getElementById('tagColor').value;
-            if(n) { myTags.push({name:n, color:c}); renderTags(); deferredSave(); document.getElementById('tagName').value=''; }
-        }
-        function delTag(i) { if(confirm('Elimina?')) { myTags.splice(i,1); renderTags(); deferredSave(); } }
-        function insertTag(name, color) {
-            if(!lastFocus) lastFocus = document.getElementById('mon');
-            lastFocus.focus();
-            const range = document.createRange();
-            range.selectNodeContents(lastFocus);
-            range.collapse(false);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-            const html = `<span class="client-tag" contenteditable="false" style="color:${color}; border-color:${color}; background:${color}20">${name}</span><div><br></div>`;
-            document.execCommand('insertHTML', false, html);
-            deferredSave();
-        }
-        function toggleTheme() {
-            const isDark = document.body.getAttribute('data-theme') === 'dark';
-            const newVal = isDark ? 'light' : 'dark';
-            document.body.setAttribute('data-theme', newVal);
-            localStorage.setItem('theme', newVal);
-        }
-        function forceSync() { 
-            document.getElementById('loadingScreen').style.display = 'flex';
-            loadData(false); 
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
