@@ -19,7 +19,7 @@ let saveTimer;
 let lastDayFocus = null; 
 let isDataLoaded = false;
 
-// Variabili per Drag & Drop
+// DRAG & DROP VARIABLES
 let dragSrcEl = null;
 let dragDay = null;
 let dragIndex = null;
@@ -56,6 +56,12 @@ function initApp() {
     
     if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
     
+    document.addEventListener('focusin', e => { 
+        if(e.target.classList.contains('task-text')) {
+            lastDayFocus = e.target.closest('.day-body').id; 
+        }
+    });
+
     updateDateDisplay();
     loadData(false);
     
@@ -107,7 +113,6 @@ async function loadData(silent) {
 
             if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
-             // DB Nuovo
              isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
              renderWeek();
@@ -148,10 +153,8 @@ window.saveFromForm = function() {
     
     let dayData = globalData[key][day];
     
-    // Header
     dayData.push({ txt: '', done: false, tag: { name: company.name, bg: company.color, col: (company.color==='#FFD600'?'#000':'#fff'), bd: company.color }, isHeader: true });
     
-    // Tasks
     const lines = tasksRaw.split('\n');
     lines.forEach(line => {
         if(line.trim()) dayData.push({ txt: line.trim(), done: false });
@@ -163,7 +166,7 @@ window.saveFromForm = function() {
     closeModal();
 }
 
-// --- RENDER CALENDARIO & DRAG/DROP ---
+// --- RENDER CALENDARIO & INTERAZIONI (DRAG/DELETE) ---
 function renderWeek() {
     const key = getWeekKey();
     const d = globalData[key] || {};
@@ -195,12 +198,12 @@ function renderWeek() {
             }
         }).join('');
 
-        // Righe vuote
+        // Righe vuote per inserimento manuale
         const emptySlots = Math.max(0, 5 - dayData.length);
         for(let e=0; e<emptySlots; e++) {
              rowsHtml += `
             <div class="task-row">
-                <span class="material-icons-round drag-handle" style="opacity:0.2">drag_indicator</span>
+                <span class="material-icons-round drag-handle" style="opacity:0.1">drag_indicator</span>
                 <div class="task-chk" onclick="addTaskManually('${dayCode}')"></div>
                 <input type="text" class="task-text" placeholder="..." onchange="addTaskManually('${dayCode}', this.value)">
             </div>`;
@@ -232,9 +235,7 @@ function renderWeek() {
 
 // --- LOGICA CANCELLAZIONE ---
 window.deleteTask = function(e, day, index) {
-    // Evita conflitti
     if(e) e.stopPropagation();
-    
     if(confirm("Eliminare questa riga?")) {
         const key = getWeekKey();
         globalData[key][day].splice(index, 1);
@@ -262,14 +263,12 @@ window.handleDrop = function(e, targetDay, targetIndex) {
     e.stopPropagation();
     e.preventDefault();
     
-    // Spostamento consentito solo nello stesso giorno per semplicità (per ora)
     if (dragDay === targetDay && dragIndex !== targetIndex) {
         const key = getWeekKey();
         const list = globalData[key][targetDay];
         
-        // Rimuovi da posizione vecchia
+        // Sposta
         const [movedItem] = list.splice(dragIndex, 1);
-        // Inserisci in posizione nuova
         list.splice(targetIndex, 0, movedItem);
         
         renderWeek();
@@ -364,10 +363,10 @@ function renderHomeWidgets() {
                 </div>`;
             }).join('');
         } else {
-            homeTasksEl.innerHTML = '<p style="color:#aaa; text-align:center; padding-top:20px">Nessuna attività oggi.</p>';
+            homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Nessuna attività oggi.</p>';
         }
     } else {
-        homeTasksEl.innerHTML = '<p style="color:#aaa; text-align:center; padding-top:20px">Buon Weekend!</p>';
+        homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Buon Weekend!</p>';
     }
     renderExternalData();
 }
@@ -379,21 +378,24 @@ function renderExternalData() {
     if (todayCalls.length > 0) {
         todayCalls.forEach(ev => {
             const time = new Date(ev.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            let html = `<div class="gcal-event"><b>${time}</b> ${ev.title}</div>`;
-            if (ev.link) html = `<a href="${ev.link}" target="_blank" class="gcal-event"><b>${time}</b> ${ev.title} 🔗</a>`;
+            let html = `<a href="${ev.link}" target="_blank" class="gcal-event">
+                        <span class="call-badge">CALL</span>
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </a>`;
             homeCallsEl.innerHTML += html;
         });
-    } else { homeCallsEl.innerHTML = '<p style="color:#aaa; text-align:center;">Nessuna call.</p>'; }
+    } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
     
     const mailEl = document.getElementById('mail-list-container');
     if(googleMixData.email.length) {
         mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join('');
-    } else { mailEl.innerHTML = '<p style="color:#aaa; font-size:12px; text-align:center;">Vuoto</p>'; }
+    } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
     
     const docEl = document.getElementById('docs-list');
     if(googleMixData.drive.length) {
         docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join('');
-    } else { docEl.innerHTML = '<p style="color:#aaa; font-size:12px; text-align:center;">Vuoto</p>'; }
+    } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
 }
 
 async function saveData() {
@@ -422,6 +424,7 @@ async function saveData() {
     } catch(e) { setStatus('Errore Save', 'err'); }
 }
 
+// --- UTILS ---
 function updateDateDisplay() {
     const start = new Date(currentMon);
     const end = new Date(currentMon); end.setDate(start.getDate() + 4);
@@ -438,7 +441,6 @@ window.changeWeek = async function(dir) { await saveData(); document.getElementB
 window.forceSync = function() { document.getElementById('loadingScreen').style.display='flex'; loadData(false); }
 window.toggleTheme = function() { const isDark = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', isDark ? 'light' : 'dark'); localStorage.setItem('theme', isDark ? 'light' : 'dark'); }
 window.fmt = function(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
-window.toggleDone = function() { document.execCommand('strikeThrough'); } // Fallback semplice per note
 function isToday(date) { const t = new Date(); return date.getDate() === t.getDate() && date.getMonth() === t.getMonth(); }
 async function fetchGoogle() {
     if(GOOGLE_SCRIPT_URL.includes("INSERISCI")) return;
@@ -454,5 +456,5 @@ async function fetchGoogle() {
 }
 function renderGoogleEvents() {
     const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<div class="gcal-event"><b>${time}</b> ${ev.title}</div>`; if(ev.link) html = `<a href="${ev.link}" target="_blank" class="gcal-event"><b>${time}</b> ${ev.title} 🔗</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
+    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
 }

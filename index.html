@@ -29,7 +29,7 @@
     </div>
 
     <!-- MODALE AGGIUNTA GRUPPO ATTIVITÀ -->
-    <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:200;">
+    <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:200;">
         <div class="modal-box">
             <div class="modal-header">
                 <h3>Nuovo Gruppo Attività</h3>
@@ -109,6 +109,7 @@
                     <input type="text" id="newCompName" placeholder="NUOVA AZIENDA">
                     <button class="btn-icon-small" onclick="addNewCompany()"><span class="material-icons-round">add</span></button>
                 </div>
+                
                 <div id="companyTagsContainer" style="display:none;"></div> 
             </div>
 
@@ -154,7 +155,10 @@
             <!-- 2. PAGINA CALENDARIO -->
             <div id="page-calendar" class="page">
                 <div class="calendar-layout-wide">
-                    <div class="cal-days-grid" id="calendar-days"></div>
+                    <div class="cal-days-grid" id="calendar-days">
+                        <!-- Giorni iniettati via JS -->
+                    </div>
+                    
                     <div class="cal-nav-bottom">
                         <button class="icon-btn" onclick="changeWeek(-1)"><span class="material-icons-round">chevron_left</span></button>
                         <span id="calDateDisplay" style="font-weight:600; font-size:14px; min-width:150px; text-align:center;">...</span>
