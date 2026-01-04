@@ -1,7 +1,8 @@
 // --- CONFIGURAZIONE ---
 const PWD = "giuseppe90";
 const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
-// INSERISCI QUI SOTTO IL TUO LINK GOOGLE SCRIPT (quello con /exec finale)
+
+// INCOLLA QUI IL NUOVO URL GOOGLE APPENA COPIATO
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
 
 // Rilevamento Test/Live
@@ -19,8 +20,6 @@ let googleMixData = { email: [], drive: [] };
 let saveTimer;
 let lastDayFocus = null; 
 let isDataLoaded = false;
-
-// Variabili Drag & Drop
 let dragSrcEl = null;
 let dragDay = null;
 let dragIndex = null;
@@ -33,47 +32,30 @@ function getRealMonday() {
     return mon;
 }
 
-// AUTO LOGIN
 if(localStorage.getItem('auth')==='1') {
-    // Nascondi login subito
-    const login = document.getElementById('loginScreen');
-    if(login) login.style.display='none';
-    // Avvia app con leggero ritardo per sicurezza
-    setTimeout(initApp, 100);
+    document.getElementById('loginScreen').style.display='none';
+    initApp();
 }
 
-// LOGIN MANUALE
 function tryLogin() {
-    const input = document.getElementById('passwordInput');
-    const err = document.getElementById('loginError');
-    
-    if(input.value.trim() === PWD) {
+    if(document.getElementById('passwordInput').value === PWD) {
         localStorage.setItem('auth', '1');
-        // Forza nascondi login PRIMA di caricare i dati
         document.getElementById('loginScreen').style.display='none';
-        document.getElementById('app').style.display='grid';
         initApp();
-    } else { 
-        err.style.display='block';
-        input.value = '';
-        input.focus();
-    }
+    } else { document.getElementById('loginError').style.display='block'; }
 }
 
 function initApp() {
-    // UI Setup
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='grid';
-    document.getElementById('loadingScreen').style.display='flex';
-    
     if (isLocal) {
         const status = document.getElementById('syncStatus');
         if(status) { status.innerText = "TEST MODE"; status.style.background = "#EF4444"; status.style.color = "white"; }
     }
+
+    document.getElementById('app').style.display='grid';
+    document.getElementById('loadingScreen').style.display='flex';
     
     if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
     
-    // Listener Focus
     document.addEventListener('focusin', e => { 
         if(e.target.classList.contains('task-text')) {
             lastDayFocus = e.target.closest('.day-body').id; 
@@ -83,17 +65,7 @@ function initApp() {
     updateDateDisplay();
     loadData(false);
     
-    // Safety Timeout: Se non carica entro 4 sec, sblocca comunque
-    setTimeout(() => { 
-        if (!isDataLoaded) { 
-            document.getElementById('loadingScreen').style.display = 'none'; 
-            isDataLoaded = true; 
-            setStatus('Recupero...', 'ok'); 
-            // Prova a renderizzare comunque la struttura vuota
-            renderWeek();
-        } 
-    }, 4000);
-    
+    setTimeout(() => { if (!isDataLoaded) { document.getElementById('loadingScreen').style.display = 'none'; isDataLoaded = true; setStatus('Recupero...', 'ok'); } }, 5000);
     setInterval(() => loadData(true), 300000); 
 }
 
@@ -133,15 +105,14 @@ async function loadData(silent) {
             renderCompanyButtons();
             
             renderWeek();
-            fetchGoogle();
+            fetchGoogle(); // Chiamata Google
             
             isDataLoaded = true;
             document.getElementById('loadingScreen').style.display='none';
             if(!silent) setStatus('Online', 'ok');
 
-            if(document.getElementById('page-home') && document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+            if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
-             // DB Nuovo
              isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
              renderWeek();
@@ -149,13 +120,146 @@ async function loadData(silent) {
     } catch(e) { if(!silent) setStatus('Offline', 'wait'); isDataLoaded = true; document.getElementById('loadingScreen').style.display='none'; }
 }
 
-// --- GESTIONE MODALE FORM ---
+// --- GOOGLE FETCH & RENDER ---
+async function fetchGoogle() {
+    if(GOOGLE_SCRIPT_URL.includes("INSERISCI")) return;
+    
+    let start = new Date(currentMon); 
+    let end = new Date(currentMon); end.setDate(end.getDate() + 5);
+    
+    console.log("Fetching Google Calendar..."); // Debug in console
+
+    try {
+        // Fetch Calendar
+        const resCal = await fetch(`${GOOGLE_SCRIPT_URL}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`);
+        gcalData = await resCal.json();
+        
+        // Fetch Mail/Drive
+        const resMix = await fetch(`${GOOGLE_SCRIPT_URL}?action=data`);
+        googleMixData = await resMix.json();
+        
+        console.log("Events found:", gcalData.length); // Debug
+
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+        renderGoogleEvents();
+
+    } catch(e) { console.error("Google Err:", e); }
+}
+
+function renderGoogleEvents() {
+    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
+    
+    // Pulisci
+    for(let i=1; i<=5; i++) { 
+        const el = document.getElementById(ids[i]);
+        if(el) el.innerHTML = ''; 
+    }
+
+    gcalData.forEach(ev => {
+        const d = new Date(ev.startTime);
+        const dayIdx = d.getDay(); // 1=Lun
+        
+        if(dayIdx >= 1 && dayIdx <= 5) {
+            const container = document.getElementById(ids[dayIdx]);
+            if(container) {
+                const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                let html = '';
+
+                // Se ha un link è cliccabile (Blu)
+                if(ev.link && ev.link.length > 5) {
+                    html = `
+                    <a href="${ev.link}" target="_blank" class="gcal-event" title="Apri Link">
+                        <span class="call-badge">CALL</span>
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </a>`;
+                } 
+                // Se non ha link è solo testo (Grigio)
+                else {
+                    html = `
+                    <div class="gcal-event" style="background:#F1F5F9; border-left-color:#94A3B8; cursor:default;">
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </div>`;
+                }
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
+}
+
+// --- RENDER CALENDARIO ---
+function renderWeek() {
+    const key = getWeekKey();
+    const d = globalData[key] || {};
+    const days = ['mon','tue','wed','thu','fri'];
+    const labels = ['LUN','MAR','MER','GIO','VEN'];
+    const todayIdx = new Date().getDay(); 
+
+    const calContainer = document.getElementById('calendar-days');
+    
+    calContainer.innerHTML = days.map((dayCode, i) => {
+        const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
+        
+        let rowsHtml = dayData.map((task, idx) => {
+            if(task.isHeader) {
+                return `
+                <div class="task-row header-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
+                    <span class="material-icons-round drag-handle">drag_indicator</span>
+                    <span class="client-tag" style="background:${task.tag.bg}; color:${task.tag.col}; border-color:${task.tag.bd}; width:100%; display:block; text-align:center;">${task.tag.name}</span>
+                    <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
+                </div>`;
+            } else {
+                return `
+                <div class="task-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
+                    <span class="material-icons-round drag-handle">drag_indicator</span>
+                    <div class="task-chk ${task.done?'checked':''}" onclick="toggleTask('${dayCode}', ${idx})"></div>
+                    <input type="text" class="task-text ${task.done?'completed':''}" value="${task.txt}" oninput="updateTask('${dayCode}', ${idx}, this.value)">
+                    <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
+                </div>`;
+            }
+        }).join('');
+
+        const emptySlots = Math.max(0, 5 - dayData.length);
+        for(let e=0; e<emptySlots; e++) {
+             rowsHtml += `
+            <div class="task-row">
+                <span class="material-icons-round drag-handle" style="opacity:0.1">drag_indicator</span>
+                <div class="task-chk" onclick="addTaskManually('${dayCode}')"></div>
+                <input type="text" class="task-text" placeholder="..." onchange="addTaskManually('${dayCode}', this.value)">
+            </div>`;
+        }
+
+        const isTodayClass = (todayIdx === i+1) ? 'current-day' : '';
+
+        return `
+        <div class="day-col ${isTodayClass}">
+            <div class="day-head">${labels[i]}</div>
+            <div class="gcal-wrapper" id="${dayCode}-gcal"></div>
+            <div class="day-body" id="${dayCode}">
+                ${rowsHtml}
+            </div>
+        </div>`;
+    }).join('');
+
+    if(globalData.account) {
+        document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
+        document.getElementById('stat-units').innerText = globalData.account.units || "0";
+        document.getElementById('account-notes').innerText = globalData.account.notes || "";
+    }
+    if(globalData.notes) document.getElementById('general-notes').innerText = globalData.notes.general || "";
+    if(globalData.home) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
+    
+    // Se gcalData ha già dati, renderizzali subito
+    if(gcalData.length > 0) renderGoogleEvents();
+}
+
+// --- ALTRE FUNZIONI (MODALE, DRAG DROP, ETC) ---
 window.openActivityModal = function() {
     document.getElementById('activityModal').style.display = 'flex';
     const select = document.getElementById('formCompany');
     if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda (tasto +)</option>';
     else select.innerHTML = companyList.map((c, i) => `<option value="${i}">${c.name}</option>`).join('');
-    
     const today = new Date().getDay();
     const daysMap = ['mon','mon','tue','wed','thu','fri','mon'];
     document.getElementById('formDay').value = daysMap[today];
@@ -170,106 +274,22 @@ window.saveFromForm = function() {
     const day = document.getElementById('formDay').value;
     const compIdx = document.getElementById('formCompany').value;
     const tasksRaw = document.getElementById('formTasks').value;
-    
     if(!companyList[compIdx]) return alert("Crea un'azienda!");
     const company = companyList[compIdx];
-
     if (!tasksRaw.trim()) return alert("Scrivi un task!");
-
     const key = getWeekKey();
     if(!globalData[key]) globalData[key] = {};
     if(!globalData[key][day]) globalData[key][day] = [];
-    
     let dayData = globalData[key][day];
-    
     dayData.push({ txt: '', done: false, tag: { name: company.name, bg: company.color, col: (company.color==='#FFD600'?'#000':'#fff'), bd: company.color }, isHeader: true });
-    
     const lines = tasksRaw.split('\n');
     lines.forEach(line => {
         if(line.trim()) dayData.push({ txt: line.trim(), done: false });
     });
-
     globalData[key][day] = dayData;
     renderWeek();
     saveData();
     closeModal();
-}
-
-// --- RENDER CALENDARIO ---
-function renderWeek() {
-    const key = getWeekKey();
-    const d = globalData[key] || {};
-    const days = ['mon','tue','wed','thu','fri'];
-    const labels = ['LUN','MAR','MER','GIO','VEN'];
-    const todayIdx = new Date().getDay(); 
-    const todayDate = new Date().getDate(); // Per capire il giorno esatto
-
-    const calContainer = document.getElementById('calendar-days');
-    
-    if(calContainer) {
-        calContainer.innerHTML = days.map((dayCode, i) => {
-            const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
-            
-            let rowsHtml = dayData.map((task, idx) => {
-                if(task.isHeader) {
-                    return `
-                    <div class="task-row header-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
-                        <span class="material-icons-round drag-handle">drag_indicator</span>
-                        <span class="client-tag" style="background:${task.tag.bg}; color:${task.tag.col}; border-color:${task.tag.bd}; width:100%; display:block; text-align:center;">${task.tag.name}</span>
-                        <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
-                    </div>`;
-                } else {
-                    const checked = task.done ? 'checked' : '';
-                    const completedClass = task.done ? 'completed' : '';
-                    return `
-                    <div class="task-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
-                        <span class="material-icons-round drag-handle">drag_indicator</span>
-                        <div class="task-chk ${checked}" onclick="toggleTask('${dayCode}', ${idx})"></div>
-                        <input type="text" class="task-text ${completedClass}" value="${task.txt}" oninput="updateTask('${dayCode}', ${idx}, this.value)">
-                        <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
-                    </div>`;
-                }
-            }).join('');
-
-            // Righe vuote
-            const emptySlots = Math.max(0, 5 - dayData.length);
-            for(let e=0; e<emptySlots; e++) {
-                rowsHtml += `
-                <div class="task-row">
-                    <span class="material-icons-round drag-handle" style="opacity:0.1">drag_indicator</span>
-                    <div class="task-chk" onclick="addTaskManually('${dayCode}')"></div>
-                    <input type="text" class="task-text" placeholder="..." onchange="addTaskManually('${dayCode}', this.value)">
-                </div>`;
-            }
-
-            // Calcolo se è oggi (per colorare l'header)
-            // Attenzione: getRealMonday ci dà il lunedì corrente.
-            // Controlliamo se la data del giorno renderizzato corrisponde a oggi
-            let thisDayDate = new Date(currentMon);
-            thisDayDate.setDate(thisDayDate.getDate() + i);
-            const isTodayClass = (thisDayDate.toDateString() === new Date().toDateString()) ? 'current-day' : '';
-
-            return `
-            <div class="day-col ${isTodayClass}">
-                <div class="day-head">${labels[i]} <span style="font-weight:400; opacity:0.7">${thisDayDate.getDate()}</span></div>
-                <div class="gcal-wrapper" id="${dayCode}-gcal"></div>
-                <div class="day-body" id="${dayCode}">
-                    ${rowsHtml}
-                </div>
-            </div>`;
-        }).join('');
-    }
-
-    // Extra Data (Account & Notes)
-    if(globalData.account) {
-        if(document.getElementById('stat-sales')) document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
-        if(document.getElementById('stat-units')) document.getElementById('stat-units').innerText = globalData.account.units || "0";
-        if(document.getElementById('account-notes')) document.getElementById('account-notes').innerText = globalData.account.notes || "";
-    }
-    if(globalData.notes && document.getElementById('general-notes')) document.getElementById('general-notes').innerText = globalData.notes.general || "";
-    if(globalData.home && document.getElementById('home-quick-notes')) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
-    
-    if(gcalData.length > 0) renderGoogleEvents();
 }
 
 window.deleteTask = function(e, day, index) {
@@ -338,10 +358,8 @@ function toggleTask(day, row) {
     }
 }
 
-// --- AZIENDE ---
 function renderCompanyButtons() {
     const cont = document.getElementById('companyTagsContainer');
-    if(!cont) return;
     if (!companyList.length) {
         cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
     } else {
@@ -374,7 +392,6 @@ window.deleteCompany = function(e, index) {
     }
 }
 
-// --- HOME WIDGETS ---
 function renderHomeWidgets() {
     const today = new Date().getDay(); 
     const daysMap = [null, 'mon', 'tue', 'wed', 'thu', 'fri'];
@@ -460,18 +477,11 @@ async function saveData() {
 function updateDateDisplay() {
     const start = new Date(currentMon);
     const end = new Date(currentMon); end.setDate(start.getDate() + 4);
-    
     const strDay = start.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
     const strWeek = `${start.getDate()} - ${end.getDate()} ${end.toLocaleDateString('it-IT', { month: 'long' })}`;
-
-    const dayLabel = document.getElementById('currentDayLabel');
-    if(dayLabel) dayLabel.innerText = strDay.charAt(0).toUpperCase() + strDay.slice(1);
-    
-    const weekLabel = document.getElementById('currentWeekRange');
-    if(weekLabel) weekLabel.innerText = strWeek;
-    
-    const calLabel = document.getElementById('calDateDisplay');
-    if(calLabel) calLabel.innerText = strWeek;
+    document.getElementById('currentDayLabel').innerText = strDay.charAt(0).toUpperCase() + strDay.slice(1);
+    document.getElementById('currentWeekRange').innerText = strWeek;
+    document.getElementById('calDateDisplay').innerText = strWeek;
 }
 
 window.changeWeek = async function(dir) { await saveData(); document.getElementById('loadingScreen').style.display='flex'; currentMon.setDate(currentMon.getDate() + (dir * 7)); updateDateDisplay(); loadData(false); }
@@ -479,19 +489,3 @@ window.forceSync = function() { document.getElementById('loadingScreen').style.d
 window.toggleTheme = function() { const isDark = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', isDark ? 'light' : 'dark'); localStorage.setItem('theme', isDark ? 'light' : 'dark'); }
 window.fmt = function(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
 function isToday(date) { const t = new Date(); return date.getDate() === t.getDate() && date.getMonth() === t.getMonth(); }
-async function fetchGoogle() {
-    if(GOOGLE_SCRIPT_URL.includes("INSERISCI")) return;
-    let start = new Date(currentMon); let end = new Date(currentMon); end.setDate(end.getDate() + 5);
-    try {
-        const resCal = await fetch(`${GOOGLE_SCRIPT_URL}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`);
-        gcalData = await resCal.json();
-        const resMix = await fetch(`${GOOGLE_SCRIPT_URL}?action=data`);
-        googleMixData = await resMix.json();
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-        renderGoogleEvents();
-    } catch(e) { console.log("Google Err", e); }
-}
-function renderGoogleEvents() {
-    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
-}
