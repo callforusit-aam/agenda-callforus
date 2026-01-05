@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CallForUs | Manager</title>
-    <!-- CSS v34 -->
-    <link rel="stylesheet" href="style.css?v=34"> 
+    <!-- CSS v37 -->
+    <link rel="stylesheet" href="style.css?v=37"> 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
@@ -28,14 +28,13 @@
         <p style="margin-top:20px; font-weight:600; color:#333">Sincronizzazione...</p>
     </div>
 
-    <!-- MODALE AGGIUNTA GRUPPO ATTIVITÀ -->
+    <!-- MODALE AGGIUNTA -->
     <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:200;">
         <div class="modal-box">
             <div class="modal-header">
                 <h3>Nuovo Gruppo Attività</h3>
                 <span class="material-icons-round close-btn" onclick="closeModal()">close</span>
             </div>
-            
             <div class="form-group">
                 <label>Giorno</label>
                 <select id="formDay" class="modal-select">
@@ -46,70 +45,66 @@
                     <option value="fri">Venerdì</option>
                 </select>
             </div>
-
             <div class="form-group">
                 <label>Azienda</label>
                 <select id="formCompany" class="modal-select"></select>
-                <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">(Crea aziende dalla toolbar qui sotto)</p>
+                <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">(Crea aziende dalla toolbar)</p>
             </div>
-
             <div class="form-group">
                 <label>Attività (una per riga)</label>
                 <textarea id="formTasks" class="modal-textarea" rows="6" placeholder="- Task 1&#10;- Task 2"></textarea>
             </div>
-
             <button class="btn-primary" onclick="saveFromForm()" style="width:100%; justify-content:center; margin-top:10px;">INSERISCI</button>
         </div>
     </div>
 
     <div id="app" style="display:none;">
         
-        <!-- SIDEBAR -->
-        <nav class="sidebar">
-            <div class="logo-icon">H</div>
-            <div class="menu">
-                <button class="menu-item active" onclick="nav('home')" title="Home"><span class="material-icons-round">dashboard</span></button>
-                <button class="menu-item" onclick="nav('calendar')" title="Calendario"><span class="material-icons-round">calendar_today</span></button>
-                <button class="menu-item" onclick="nav('account')" title="Account"><span class="material-icons-round">bar_chart</span></button>
-                <button class="menu-item" onclick="nav('notes')" title="Note"><span class="material-icons-round">folder_open</span></button>
-            </div>
-            <div style="margin-top:auto">
-                <button class="menu-item" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
-            </div>
-        </nav>
-
-        <main>
-            <header>
-                <div class="header-title">
+        <!-- HEADER (NUOVA NAVIGAZIONE) -->
+        <header>
+            <div class="header-left">
+                <img src="logo.png" alt="Logo" class="app-logo" onerror="this.style.display='none'">
+                <div class="header-info">
                     <h2 id="pageTitle">Dashboard</h2>
-                    <div class="date-info">
-                        <span id="currentDayLabel" class="today-label">...</span>
-                        <span id="currentWeekRange" class="week-label">...</span>
-                    </div>
+                    <span id="currentDate" class="subtitle">...</span>
                 </div>
-                <div class="header-actions">
-                    <div id="syncStatus" class="status-badge status-ok">Sync...</div>
-                    <button class="icon-btn" onclick="manualSave()" title="Salva"><span class="material-icons-round">save</span></button>
-                    <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
-                    <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-primary">
-                        <span class="material-icons-round">add_circle</span> Organizza Call
-                    </a>
-                </div>
-            </header>
+            </div>
 
-            <!-- TOOLBAR -->
+            <!-- MENU CENTRALE (Al posto della sidebar) -->
+            <nav class="top-nav">
+                <button class="nav-link active" onclick="nav('home')">Home</button>
+                <button class="nav-link" onclick="nav('calendar')">Calendario</button>
+                <button class="nav-link" onclick="nav('account')">Account</button>
+                <button class="nav-link" onclick="nav('notes')">Note</button>
+            </nav>
+
+            <div class="header-actions">
+                <div id="syncStatus" class="status-badge status-ok">Sync...</div>
+                
+                <button class="icon-btn" onclick="manualSave()" title="Salva"><span class="material-icons-round">save</span></button>
+                <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
+                <button class="icon-btn" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
+                
+                <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-primary">
+                    <span class="material-icons-round">add_circle</span> Organizza Call
+                </a>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main>
+            
+            <!-- TOOLBAR (Visibile solo in Calendar) -->
             <div class="toolbar" id="mainToolbar" style="display:none;">
                 <button class="btn-primary" onclick="openActivityModal()" style="margin-right:20px; background:var(--text-main); color:var(--bg-card); border:1px solid var(--border);">
                     <span class="material-icons-round">playlist_add</span> Gruppo
                 </button>
 
-                <!-- Gestione Aziende -->
                 <div class="company-creator">
                     <input type="color" id="newCompColor" value="#000000" title="Colore Azienda">
                     <input type="text" id="newCompName" placeholder="NUOVA AZIENDA">
                     <button class="btn-icon-small" onclick="addNewCompany()"><span class="material-icons-round">add</span></button>
                 </div>
-                
                 <div id="companyTagsContainer" style="display:none;"></div> 
             </div>
 
@@ -149,6 +144,7 @@
                         <div class="card-header"><h3>Note Veloci</h3></div>
                         <textarea id="home-quick-notes" placeholder="Scrivi appunti..." oninput="saveData()"></textarea>
                     </div>
+
                 </div>
             </div>
 
