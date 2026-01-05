@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CallForUs | Manager</title>
-    <!-- CSS v37 -->
-    <link rel="stylesheet" href="style.css?v=37"> 
+    <link rel="stylesheet" href="style.css?v=42"> 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
@@ -23,16 +22,16 @@
     </div>
 
     <!-- LOADING -->
-    <div id="loadingScreen" class="overlay" style="display:none; background:rgba(255,255,255,0.9);">
+    <div id="loadingScreen" class="overlay" style="display:none; background:rgba(255,255,255,0.95); z-index: 2000;">
         <div class="loader"></div>
-        <p style="margin-top:20px; font-weight:600; color:#333">Sincronizzazione...</p>
+        <p style="margin-top:20px; font-weight:600; color:#333" id="loadingText">Avvio sistema...</p>
     </div>
 
     <!-- MODALE AGGIUNTA -->
-    <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:200;">
+    <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:1500;">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Nuovo Gruppo Attività</h3>
+                <h3>Nuovo Gruppo</h3>
                 <span class="material-icons-round close-btn" onclick="closeModal()">close</span>
             </div>
             <div class="form-group">
@@ -48,10 +47,10 @@
             <div class="form-group">
                 <label>Azienda</label>
                 <select id="formCompany" class="modal-select"></select>
-                <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">(Crea aziende dalla toolbar)</p>
+                <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">(Gestisci aziende dalla toolbar)</p>
             </div>
             <div class="form-group">
-                <label>Attività (una per riga)</label>
+                <label>Attività</label>
                 <textarea id="formTasks" class="modal-textarea" rows="6" placeholder="- Task 1&#10;- Task 2"></textarea>
             </div>
             <button class="btn-primary" onclick="saveFromForm()" style="width:100%; justify-content:center; margin-top:10px;">INSERISCI</button>
@@ -60,41 +59,39 @@
 
     <div id="app" style="display:none;">
         
-        <!-- HEADER (NUOVA NAVIGAZIONE) -->
-        <header>
-            <div class="header-left">
-                <img src="logo.png" alt="Logo" class="app-logo" onerror="this.style.display='none'">
-                <div class="header-info">
-                    <h2 id="pageTitle">Dashboard</h2>
-                    <span id="currentDate" class="subtitle">...</span>
-                </div>
+        <nav class="sidebar">
+            <div class="logo-icon">H</div>
+            <div class="menu">
+                <button class="menu-item active" onclick="nav('home')" title="Home"><span class="material-icons-round">dashboard</span></button>
+                <button class="menu-item" onclick="nav('calendar')" title="Calendario"><span class="material-icons-round">calendar_today</span></button>
+                <button class="menu-item" onclick="nav('account')" title="Account"><span class="material-icons-round">bar_chart</span></button>
+                <button class="menu-item" onclick="nav('notes')" title="Note"><span class="material-icons-round">folder_open</span></button>
             </div>
-
-            <!-- MENU CENTRALE (Al posto della sidebar) -->
-            <nav class="top-nav">
-                <button class="nav-link active" onclick="nav('home')">Home</button>
-                <button class="nav-link" onclick="nav('calendar')">Calendario</button>
-                <button class="nav-link" onclick="nav('account')">Account</button>
-                <button class="nav-link" onclick="nav('notes')">Note</button>
-            </nav>
-
-            <div class="header-actions">
-                <div id="syncStatus" class="status-badge status-ok">Sync...</div>
-                
-                <button class="icon-btn" onclick="manualSave()" title="Salva"><span class="material-icons-round">save</span></button>
-                <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
-                <button class="icon-btn" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
-                
-                <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-primary">
-                    <span class="material-icons-round">add_circle</span> Organizza Call
-                </a>
+            <div style="margin-top:auto">
+                <button class="menu-item" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
             </div>
-        </header>
+        </nav>
 
-        <!-- MAIN CONTENT -->
         <main>
-            
-            <!-- TOOLBAR (Visibile solo in Calendar) -->
+            <header>
+                <div class="header-title">
+                    <h2 id="pageTitle">Dashboard</h2>
+                    <div class="date-info">
+                        <span id="currentDayLabel" class="today-label">...</span>
+                        <span id="currentWeekRange" class="week-label">...</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div id="syncStatus" class="status-badge status-ok">Sync...</div>
+                    <button class="icon-btn" onclick="manualSave()" title="Salva"><span class="material-icons-round">save</span></button>
+                    <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
+                    <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-primary">
+                        <span class="material-icons-round">add_circle</span> Organizza Call
+                    </a>
+                </div>
+            </header>
+
+            <!-- TOOLBAR -->
             <div class="toolbar" id="mainToolbar" style="display:none;">
                 <button class="btn-primary" onclick="openActivityModal()" style="margin-right:20px; background:var(--text-main); color:var(--bg-card); border:1px solid var(--border);">
                     <span class="material-icons-round">playlist_add</span> Gruppo
@@ -108,10 +105,9 @@
                 <div id="companyTagsContainer" style="display:none;"></div> 
             </div>
 
-            <!-- 1. PAGINA HOME -->
+            <!-- HOME -->
             <div id="page-home" class="page active">
                 <div class="dashboard-grid">
-                    
                     <div class="card focus-card">
                         <div class="card-header">
                             <h3>Attività di Oggi</h3>
@@ -119,7 +115,6 @@
                         </div>
                         <div class="card-body" id="home-tasks" style="padding-right:5px; overflow-y:auto;"></div>
                     </div>
-
                     <div class="card call-card">
                         <div class="card-header">
                             <h3>Prossima Call</h3>
@@ -127,34 +122,27 @@
                         </div>
                         <div class="card-body" id="home-calls"></div>
                     </div>
-
                     <div class="card mail-card">
                         <div class="card-header"><h3>Posta</h3></div>
                         <div class="card-body scrollable" id="mail-list-container"></div>
                         <a href="https://mail.google.com" target="_blank" class="btn-secondary" style="margin-top:10px;">Apri Gmail</a>
                     </div>
-
                     <div class="card docs-card">
                         <div class="card-header"><h3>Docs</h3></div>
                         <div class="card-body scrollable" id="docs-list"></div>
                         <a href="https://drive.google.com" target="_blank" class="btn-secondary" style="margin-top:10px;">Apri Drive</a>
                     </div>
-
                     <div class="card input-card">
                         <div class="card-header"><h3>Note Veloci</h3></div>
                         <textarea id="home-quick-notes" placeholder="Scrivi appunti..." oninput="saveData()"></textarea>
                     </div>
-
                 </div>
             </div>
 
-            <!-- 2. PAGINA CALENDARIO -->
+            <!-- CALENDARIO -->
             <div id="page-calendar" class="page">
                 <div class="calendar-layout-wide">
-                    <div class="cal-days-grid" id="calendar-days">
-                        <!-- Giorni iniettati via JS -->
-                    </div>
-                    
+                    <div class="cal-days-grid" id="calendar-days"></div>
                     <div class="cal-nav-bottom">
                         <button class="icon-btn" onclick="changeWeek(-1)"><span class="material-icons-round">chevron_left</span></button>
                         <span id="calDateDisplay" style="font-weight:600; font-size:14px; min-width:150px; text-align:center;">...</span>
@@ -163,25 +151,16 @@
                 </div>
             </div>
 
-            <!-- 3. PAGINA ACCOUNT -->
+            <!-- ACCOUNT -->
             <div id="page-account" class="page">
                 <div class="account-grid">
-                    <div class="card" style="text-align:center;">
-                        <h3>Vendite Oggi</h3>
-                        <div class="big-num" contenteditable="true" id="stat-sales" oninput="saveData()">€ 0,00</div>
-                    </div>
-                    <div class="card" style="text-align:center;">
-                        <h3>Unità Vendute</h3>
-                        <div class="big-num" contenteditable="true" id="stat-units" oninput="saveData()">0</div>
-                    </div>
-                    <div class="card" style="grid-column:1/-1; min-height:400px;">
-                        <div class="card-header"><h3>Note Performance</h3></div>
-                        <div id="account-notes" contenteditable="true" style="height:100%; outline:none;" oninput="saveData()"></div>
-                    </div>
+                    <div class="card" style="text-align:center;"><h3>Vendite Oggi</h3><div class="big-num" contenteditable="true" id="stat-sales" oninput="saveData()">€ 0,00</div></div>
+                    <div class="card" style="text-align:center;"><h3>Unità Vendute</h3><div class="big-num" contenteditable="true" id="stat-units" oninput="saveData()">0</div></div>
+                    <div class="card" style="grid-column:1/-1; min-height:400px;"><div class="card-header"><h3>Note Performance</h3></div><div id="account-notes" contenteditable="true" style="height:100%; outline:none;" oninput="saveData()"></div></div>
                 </div>
             </div>
 
-            <!-- 4. PAGINA NOTE -->
+            <!-- NOTE -->
             <div id="page-notes" class="page">
                 <div class="card" style="height:100%">
                     <div class="card-header"><h3>Blocco Note Generale</h3></div>

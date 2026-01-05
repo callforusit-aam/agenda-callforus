@@ -1,19 +1,16 @@
 // --- CONFIGURAZIONE ---
 const PWD = "giuseppe90";
 const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
-
-// LINK GOOGLE (Inserisci i tuoi se diversi)
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbxB9o4nTJpwgKKdYaCkHtjSTu7SeQsMvUPd-xiXbrXOBgXxkc_X9HjtrUdCxZ2Cs_FS/exec"; 
-const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
+const GCAL_2 = "https://script.google.com/macros/s/AKfycbz40zr-5GS7zX9ZPK3HlSpp5TCWyLzhU0RnFRccUvUTDZ44SaKxct_MFKnCNo571nZN/exec";
 
 // Rilevamento Test/Live
 const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "";
-const BASKET = isLocal ? "Dashboard_TEST_LOCAL" : "Dashboard"; 
+const BASKET = isLocal ? "Dashboard_TEST_FINAL" : "Dashboard_FINAL"; 
 const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET}`;
 
 const DEFAULT_COMPANIES = [];
 
-// --- VARIABILI GLOBALI ---
 let currentMon = getRealMonday();
 let globalData = {};
 let companyList = [];
@@ -24,7 +21,6 @@ let lastDayFocus = null;
 let isDataLoaded = false;
 let dragSrcEl, dragDay, dragIndex;
 
-// --- UTILS DATA ---
 function getRealMonday() {
     const d = new Date();
     const day = d.getDay(); 
@@ -33,57 +29,31 @@ function getRealMonday() {
     return mon;
 }
 
-// --- AVVIO SICURO ---
-document.addEventListener("DOMContentLoaded", () => {
-    // Se già loggato, avvia subito
-    if(localStorage.getItem('auth') === '1') {
-        const loginScreen = document.getElementById('loginScreen');
-        if(loginScreen) loginScreen.style.display = 'none';
-        initApp();
-    }
-});
+if(localStorage.getItem('auth')==='1') {
+    document.getElementById('loginScreen').style.display='none';
+    initApp();
+}
 
-// Funzione Login esposta globalmente
-window.tryLogin = function() {
-    const input = document.getElementById('passwordInput');
-    const err = document.getElementById('loginError');
-    
-    if(input.value.trim() === PWD) {
+function tryLogin() {
+    if(document.getElementById('passwordInput').value === PWD) {
         localStorage.setItem('auth', '1');
-        // Nascondi login
-        document.getElementById('loginScreen').style.display = 'none';
-        // Mostra app
-        document.getElementById('app').style.display = 'grid';
         initApp();
-    } else { 
-        err.style.display = 'block'; 
-        // Shake animation reset
-        input.style.border = "1px solid red";
-    }
+    } else { document.getElementById('loginError').style.display='block'; }
 }
 
 function initApp() {
-    console.log("App iniziata...");
-    
-    // Mostra interfaccia
-    const app = document.getElementById('app');
-    const loader = document.getElementById('loadingScreen');
-    if(app) app.style.display = 'grid';
-    if(loader) loader.style.display = 'flex';
-
     if (isLocal) {
         const status = document.getElementById('syncStatus');
-        if(status) { 
-            status.innerText = "TEST MODE"; 
-            status.style.background = "#EF4444"; 
-            status.style.color = "white"; 
-        }
+        if(status) { status.innerText = "TEST MODE"; status.style.background = "#EF4444"; status.style.color = "white"; }
     }
 
-    // Tema
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='grid';
+    document.getElementById('loadingScreen').style.display='flex';
+    document.getElementById('loadingText').innerText = "Avvio sistema...";
+    
     if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
     
-    // Listener Focus per Tag
     document.addEventListener('focusin', e => { 
         if(e.target.classList.contains('task-text')) {
             lastDayFocus = e.target.closest('.day-body').id; 
@@ -91,32 +61,22 @@ function initApp() {
     });
 
     updateDateDisplay();
-    
-    // Caricamento Dati
     loadData(false);
     
-    // Timeout di Sicurezza (Sblocco forzato dopo 4 sec)
+    // Timeout Sicurezza
     setTimeout(() => { 
         if (!isDataLoaded) { 
-            console.warn("Forzatura avvio per timeout");
-            if(loader) loader.style.display = 'none'; 
+            document.getElementById('loadingScreen').style.display = 'none'; 
             isDataLoaded = true; 
             setStatus('Recupero...', 'ok'); 
-            renderWeek(); // Renderizza anche se vuoto
         } 
-    }, 4000);
-
-    // Sync periodico
+    }, 6000);
     setInterval(() => loadData(true), 300000); 
 }
 
-// --- NAVIGAZIONE ---
-window.nav = function(page) {
+function nav(page) {
     document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
-    // Trova il bottone cliccato
-    const btn = document.querySelector(`.menu-item[onclick*="${page}"]`);
-    if(btn) btn.classList.add('active');
-    
+    event.currentTarget.classList.add('active');
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
     
@@ -124,8 +84,7 @@ window.nav = function(page) {
     if(tb) tb.style.display = (page === 'calendar') ? 'flex' : 'none';
     
     const titles = { 'home': 'Dashboard', 'calendar': 'Calendario', 'account': 'Account Amazon', 'notes': 'Blocco Note' };
-    const titleEl = document.getElementById('pageTitle');
-    if(titleEl) titleEl.innerText = titles[page];
+    document.getElementById('pageTitle').innerText = titles[page];
     
     if(page === 'home') renderHomeWidgets();
 }
@@ -134,17 +93,15 @@ function getWeekKey() { return "W_" + currentMon.toISOString().split('T')[0]; }
 
 function setStatus(msg, type) {
     const el = document.getElementById('syncStatus');
-    if(!el) return;
     if(isLocal && msg !== "Salvataggio...") return;
     el.innerText = msg;
     el.className = `status-badge status-${type}`;
 }
 
-// --- DATI ---
 async function loadData(silent) {
     if(!silent) setStatus('Sync...', 'wait');
     try {
-        const res = await fetch(PANTRY_URL + "?t=" + Date.now());
+        const res = await fetch(PANTRY_URL + "?t=" + Date.now(), { cache: "no-store" });
         if(res.ok) {
             const json = await res.json();
             globalData = json || {};
@@ -156,32 +113,23 @@ async function loadData(silent) {
             fetchGoogle();
             
             isDataLoaded = true;
-            const loader = document.getElementById('loadingScreen');
-            if(loader) loader.style.display='none';
+            document.getElementById('loadingScreen').style.display='none';
             if(!silent) setStatus('Online', 'ok');
 
-            const home = document.getElementById('page-home');
-            if(home && home.classList.contains('active')) renderHomeWidgets();
+            if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
-             // DB Nuovo
              isDataLoaded = true;
-             const loader = document.getElementById('loadingScreen');
-             if(loader) loader.style.display='none';
+             document.getElementById('loadingScreen').style.display='none';
              renderWeek();
         }
-    } catch(e) { 
-        if(!silent) setStatus('Offline', 'wait'); 
-        isDataLoaded = true; 
-        const loader = document.getElementById('loadingScreen');
-        if(loader) loader.style.display='none';
-    }
+    } catch(e) { if(!silent) setStatus('Offline', 'wait'); isDataLoaded = true; document.getElementById('loadingScreen').style.display='none'; }
 }
 
-// --- MODALE & FORM ---
+// --- GESTIONE MODALE FORM ---
 window.openActivityModal = function() {
     document.getElementById('activityModal').style.display = 'flex';
     const select = document.getElementById('formCompany');
-    if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda</option>';
+    if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda (tasto +)</option>';
     else select.innerHTML = companyList.map((c, i) => `<option value="${i}">${c.name}</option>`).join('');
     
     const today = new Date().getDay();
@@ -210,15 +158,8 @@ window.saveFromForm = function() {
     
     let dayData = globalData[key][day];
     
-    // Header Azienda
-    dayData.push({ 
-        txt: '', 
-        done: false, 
-        tag: { name: company.name, bg: company.color, col: (company.color==='#FFD600'?'#000':'#fff'), bd: company.color }, 
-        isHeader: true 
-    });
+    dayData.push({ txt: '', done: false, tag: { name: company.name, bg: company.color, col: (company.color==='#FFD600'?'#000':'#fff'), bd: company.color }, isHeader: true });
     
-    // Tasks
     const lines = tasksRaw.split('\n');
     lines.forEach(line => {
         if(line.trim()) dayData.push({ txt: line.trim(), done: false });
@@ -230,7 +171,7 @@ window.saveFromForm = function() {
     closeModal();
 }
 
-// --- RENDER WEEK & DRAG DROP ---
+// --- RENDER CALENDARIO & INTERAZIONI (FIXED CHECKBOX) ---
 function renderWeek() {
     const key = getWeekKey();
     const d = globalData[key] || {};
@@ -239,7 +180,6 @@ function renderWeek() {
     const todayIdx = new Date().getDay(); 
 
     const calContainer = document.getElementById('calendar-days');
-    if(!calContainer) return;
     
     calContainer.innerHTML = days.map((dayCode, i) => {
         const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
@@ -265,7 +205,6 @@ function renderWeek() {
             }
         }).join('');
 
-        // Righe vuote extra
         const emptySlots = Math.max(0, 5 - dayData.length);
         for(let e=0; e<emptySlots; e++) {
              rowsHtml += `
@@ -288,28 +227,17 @@ function renderWeek() {
         </div>`;
     }).join('');
 
-    // Dati Extra
     if(globalData.account) {
-        const sales = document.getElementById('stat-sales');
-        if(sales) sales.innerText = globalData.account.sales || "€ 0,00";
-        const units = document.getElementById('stat-units');
-        if(units) units.innerText = globalData.account.units || "0";
-        const notes = document.getElementById('account-notes');
-        if(notes) notes.innerText = globalData.account.notes || "";
+        document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
+        document.getElementById('stat-units').innerText = globalData.account.units || "0";
+        document.getElementById('account-notes').innerText = globalData.account.notes || "";
     }
-    if(globalData.notes) {
-        const genNotes = document.getElementById('general-notes');
-        if(genNotes) genNotes.innerText = globalData.notes.general || "";
-    }
-    if(globalData.home) {
-        const homeNote = document.getElementById('home-quick-notes');
-        if(homeNote) homeNote.value = globalData.home.quick || "";
-    }
+    if(globalData.notes) document.getElementById('general-notes').innerText = globalData.notes.general || "";
+    if(globalData.home) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
     
     if(gcalData.length > 0) renderGoogleEvents();
 }
 
-// --- AZIONI TASK ---
 window.deleteTask = function(e, day, index) {
     if(e) e.stopPropagation();
     if(confirm("Eliminare questa riga?")) {
@@ -335,7 +263,8 @@ window.handleDragOver = function(e) {
 }
 
 window.handleDrop = function(e, targetDay, targetIndex) {
-    e.stopPropagation(); e.preventDefault();
+    e.stopPropagation();
+    e.preventDefault();
     if (dragDay === targetDay && dragIndex !== targetIndex) {
         const key = getWeekKey();
         const list = globalData[key][targetDay];
@@ -353,36 +282,31 @@ window.addTaskManually = function(day, val) {
     if(!globalData[key][day]) globalData[key][day] = [];
     
     const txt = (typeof val === 'string') ? val : '';
-    const done = (typeof val !== 'string'); // Se non è stringa, è click su check
-
+    const done = (typeof val !== 'string'); 
     globalData[key][day].push({ txt: txt, done: done });
+    
     renderWeek();
-    deferredSave();
+    saveData(); // SALVATAGGIO IMMEDIATO PER LE SPUNTE
 }
 
 function updateTask(day, row, val) {
     const key = getWeekKey();
-    if(!globalData[key]) globalData[key] = {};
-    if(!globalData[key][day]) globalData[key][day] = [];
-    // Se l'indice non esiste (riga nuova), crealo
-    if(!globalData[key][day][row]) globalData[key][day][row] = { txt:'', done:false };
-    
-    globalData[key][day][row].txt = val;
-    deferredSave();
+    if(globalData[key][day][row]) {
+        globalData[key][day][row].txt = val;
+        deferredSave();
+    }
 }
 
 function toggleTask(day, row) {
     const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+    if(globalData[key][day][row]) {
         globalData[key][day][row].done = !globalData[key][day][row].done;
         renderWeek();
-        deferredSave();
-        const home = document.getElementById('page-home');
-        if(home && home.classList.contains('active')) renderHomeWidgets();
+        saveData(); // SALVATAGGIO IMMEDIATO
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
     }
 }
 
-// --- AZIENDE ---
 function renderCompanyButtons() {
     const cont = document.getElementById('companyTagsContainer');
     if (!companyList.length) {
@@ -417,7 +341,6 @@ window.deleteCompany = function(e, index) {
     }
 }
 
-// --- HOME ---
 function renderHomeWidgets() {
     const today = new Date().getDay(); 
     const daysMap = [null, 'mon', 'tue', 'wed', 'thu', 'fri'];
@@ -431,7 +354,6 @@ function renderHomeWidgets() {
         
         if(activeTasks.length > 0) {
             homeTasksEl.innerHTML = activeTasks.map((t, i) => {
-                // Trova indice reale
                 const realIdx = tasks.indexOf(t);
                 return `
                 <div class="task-row" style="border-bottom:1px solid #f0f0f0;">
@@ -440,7 +362,7 @@ function renderHomeWidgets() {
                 </div>`;
             }).join('');
         } else {
-            homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Nessuna attività.</p>';
+            homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Nessuna attività oggi.</p>';
         }
     } else {
         homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Buon Weekend!</p>';
@@ -465,13 +387,13 @@ function renderExternalData() {
     } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
     
     const mailEl = document.getElementById('mail-list-container');
-    if(googleMixData.email && googleMixData.email.length) {
-        mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join('');
+    if(mailData.length) {
+        mailEl.innerHTML = mailData.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from} (${m.account})</span><span class="mail-subj">${m.subject}</span></div>`).join('');
     } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
     
     const docEl = document.getElementById('docs-list');
-    if(googleMixData.drive && googleMixData.drive.length) {
-        docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join('');
+    if(docData.length) {
+        docEl.innerHTML = docData.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join('');
     } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
 }
 
@@ -506,42 +428,37 @@ function updateDateDisplay() {
     const end = new Date(currentMon); end.setDate(start.getDate() + 4);
     const strDay = start.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
     const strWeek = `${start.getDate()} - ${end.getDate()} ${end.toLocaleDateString('it-IT', { month: 'long' })}`;
-
-    const dayEl = document.getElementById('currentDayLabel');
-    if(dayEl) dayEl.innerText = strDay.charAt(0).toUpperCase() + strDay.slice(1);
-    const weekEl = document.getElementById('currentWeekRange');
-    if(weekEl) weekEl.innerText = strWeek;
-    const calEl = document.getElementById('calDateDisplay');
-    if(calEl) calEl.innerText = strWeek;
+    document.getElementById('currentDayLabel').innerText = strDay.charAt(0).toUpperCase() + strDay.slice(1);
+    document.getElementById('currentWeekRange').innerText = strWeek;
+    document.getElementById('calDateDisplay').innerText = strWeek;
 }
 
 window.changeWeek = async function(dir) { await saveData(); document.getElementById('loadingScreen').style.display='flex'; currentMon.setDate(currentMon.getDate() + (dir * 7)); updateDateDisplay(); loadData(false); }
 window.forceSync = function() { document.getElementById('loadingScreen').style.display='flex'; loadData(false); }
 window.toggleTheme = function() { const isDark = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', isDark ? 'light' : 'dark'); localStorage.setItem('theme', isDark ? 'light' : 'dark'); }
 window.fmt = function(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
-window.toggleDone = function() { document.execCommand('strikeThrough'); } // Fallback per note
 function isToday(date) { const t = new Date(); return date.getDate() === t.getDate() && date.getMonth() === t.getMonth(); }
-
 async function fetchGoogle() {
     if(GCAL_1.includes("LINK")) return;
     let start = new Date(currentMon); let end = new Date(currentMon); end.setDate(end.getDate() + 5);
     try {
-        // Fetch Calendar (Doppio Script)
         const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
         const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        
-        // Fetch Mail/Drive (Solo dal primo per semplicità)
-        const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
+        const pData1 = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
+        const pData2 = fetch(`${GCAL_2}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
 
-        const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
+        const [ev1, ev2, d1, d2] = await Promise.all([p1, p2, pData1, pData2]);
         
         gcalData = [...ev1, ...ev2];
-        googleMixData = data;
+        mailData = [...(d1.email||[]), ...(d2.email||[])];
+        docData = [...(d1.drive||[]), ...(d2.drive||[])];
         
+        mailData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
         if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         renderGoogleEvents();
 
-    } catch(e) { console.log("Google Err", e); }
+    } catch(e) { console.error("Google Err:", e); }
 }
 
 function renderGoogleEvents() {
