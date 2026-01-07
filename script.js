@@ -1,18 +1,16 @@
-// --- CONFIGURAZIONE JSONBIN (IL TUO DATABASE) ---
+// --- CONFIGURAZIONE ---
 const PWD = "giuseppe90";
+
+// CONFIGURAZIONE JSONBIN (Il tuo nuovo Database)
 const BIN_ID = "695e8223d0ea881f405b10f2";
 const API_KEY = "$2a$10$/b3gwPG1OcyJYyOgtNM.iujzuvPXS5bPnyJvDz5UI9StDI.nQFMQG";
 const URL_BIN = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-// LINK GOOGLE SCRIPT
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
+// LINK GOOGLE SCRIPT (I tuoi script)
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbxKEBpzjP6zbrato19rFr1YrTU6hKEy9iy712jVmpVa5Lfw2FKtgCX7Lmv_FHnStvwr/exec";
 const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
 
-// Rilevamento Test/Live
-const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "";
-// JSONBin non usa "basket" diversi con lo stesso ID, usiamo una proprietà interna o ignoriamo per ora
-// Per sicurezza in locale salviamo comunque, ma sappi che sovrascrive il BIN unico che hai fornito.
-
+// AZIENDE DEFAULT
 const DEFAULT_COMPANIES = [];
 
 // --- STATO ---
@@ -20,11 +18,13 @@ let currentMon = getRealMonday();
 let globalData = {};
 let companyList = [];
 let gcalData = []; 
-let googleMixData = { email: [], drive: [] };
 let saveTimer;
 let lastDayFocus = null; 
 let isDataLoaded = false;
 let dragSrcEl, dragDay, dragIndex;
+
+// Rilevamento Locale
+const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "";
 
 // --- INIT ---
 function getRealMonday() {
@@ -51,10 +51,8 @@ function tryLogin() {
 function initApp() {
     document.getElementById('app').style.display='grid';
     document.getElementById('loadingScreen').style.display='flex';
-    // Testo corretto per capire cosa sta facendo
-    const loadingText = document.querySelector('#loadingScreen p');
-    if(loadingText) loadingText.innerText = "Connessione JSONBin...";
-
+    document.getElementById('loadingText').innerText = "Connessione JSONBin..."; // Feedback visivo
+    
     if (isLocal) {
         const status = document.getElementById('syncStatus');
         status.innerText = "TEST MODE"; 
@@ -71,23 +69,12 @@ function initApp() {
     });
 
     updateDateDisplay();
-    
-    // Avvia caricamento
     loadData(false);
     
     // Timeout sicurezza: se JSONBin non risponde in 5 sec, sblocca
-    setTimeout(() => { 
-        if (!isDataLoaded) { 
-            document.getElementById('loadingScreen').style.display = 'none'; 
-            isDataLoaded = true; 
-            setStatus('Recupero...', 'ok'); 
-            // Inizializza vuoto se fallisce
-            renderWeek();
-            renderSidebar();
-        } 
-    }, 5000);
+    setTimeout(() => { if (!isDataLoaded) { document.getElementById('loadingScreen').style.display = 'none'; isDataLoaded = true; setStatus('Recupero...', 'ok'); } }, 5000);
     
-    setInterval(() => loadData(true), 300000); 
+    setInterval(() => loadData(true), 300000); // 5 min sync
 }
 
 function nav(page) {
@@ -117,46 +104,54 @@ function setStatus(msg, type) {
 // --- CARICAMENTO DATI (JSONBIN) ---
 async function loadData(silent) {
     if(!silent) setStatus('Sync...', 'wait');
+    
     try {
+        // Se siamo in locale, usiamo localStorage per non sporcare JSONBin (opzionale, ma sicuro)
+        if (isLocal) {
+            const localData = localStorage.getItem('Dashboard_TEST');
+            globalData = localData ? JSON.parse(localData) : {};
+            finishLoad(silent);
+            return;
+        }
+
         const res = await fetch(URL_BIN, {
             method: 'GET',
             headers: {
                 'X-Master-Key': API_KEY,
-                'Cache-Control': 'no-cache'
+                'Cache-Control': 'no-cache' // Importante per non vedere dati vecchi
             }
         });
 
         if(res.ok) {
             const json = await res.json();
-            // JSONBin mette i dati dentro .record
-            globalData = json.record || {};
-            
-            companyList = globalData.COMPANIES || DEFAULT_COMPANIES;
-            renderCompanyButtons();
-            
-            renderWeek();     
-            renderSidebar();
-            
-            fetchGoogle();
-            
-            isDataLoaded = true;
-            document.getElementById('loadingScreen').style.display='none';
-            if(!silent) setStatus('Online', 'ok');
-
-            if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+            globalData = json.record || {}; // JSONBin usa .record
+            finishLoad(silent);
         } else {
-             console.log("Errore JSONBin o Bin Vuoto");
+             console.log("Errore JSONBin", res.status);
              isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
-             renderWeek();
-             renderSidebar();
         }
     } catch(e) { 
-        console.error(e);
         if(!silent) setStatus('Offline', 'wait'); 
         isDataLoaded = true; 
         document.getElementById('loadingScreen').style.display='none';
     }
+}
+
+function finishLoad(silent) {
+    companyList = globalData.COMPANIES || DEFAULT_COMPANIES;
+    renderCompanyButtons();
+    
+    renderWeek();     
+    
+    // Scarica Google (Solo Call)
+    fetchGoogle();
+    
+    isDataLoaded = true;
+    document.getElementById('loadingScreen').style.display='none';
+    if(!silent) setStatus('Online', 'ok');
+
+    if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
 }
 
 // --- SALVATAGGIO (JSONBIN - PUT) ---
@@ -177,17 +172,7 @@ async function saveData(immediate) {
     
     const key = getWeekKey();
     
-    // Salva Sidebar (Call e Todo)
-    const callInputs = Array.from(document.querySelectorAll('#callList input')).map(i => i.value);
-    const todoInputs = Array.from(document.querySelectorAll('#todoList input.sb-input')).map(i => i.value);
-    const todoChecks = Array.from(document.querySelectorAll('#todoList .chk')).map(c => c.classList.contains('checked'));
-    
-    if(!globalData[key]) globalData[key] = {};
-    globalData[key].calls = callInputs;
-    globalData[key].todos = todoInputs;
-    globalData[key].todoChecks = todoChecks;
-
-    // Salva Account e Note
+    // Recupero dati extra dal DOM
     if(document.getElementById('stat-sales')) {
         globalData.account = {
             sales: document.getElementById('stat-sales').innerText,
@@ -203,6 +188,13 @@ async function saveData(immediate) {
     }
     globalData.COMPANIES = companyList;
 
+    // Se locale, salva in localStorage
+    if(isLocal) {
+        localStorage.setItem('Dashboard_TEST', JSON.stringify(globalData));
+        setStatus('Salvato (Test)', 'ok');
+        return;
+    }
+
     try {
         await fetch(URL_BIN, { 
             method: 'PUT', 
@@ -217,65 +209,6 @@ async function saveData(immediate) {
         setStatus('Errore Save', 'err'); 
         console.error(e);
     }
-}
-
-// --- GESTIONE TASK E SPUNTE ---
-
-window.addTaskManually = function(day, val) {
-    const key = getWeekKey();
-    if(!globalData[key]) globalData[key] = {};
-    if(!globalData[key][day]) globalData[key][day] = [];
-    
-    const txt = (typeof val === 'string') ? val : '';
-    const done = (typeof val !== 'string'); 
-    
-    globalData[key][day].push({ txt: txt, done: done });
-    
-    renderWeek();
-    saveData(true); // Salva subito
-}
-
-function updateTask(day, row, val) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].txt = val;
-        deferredSave();
-    }
-}
-
-function toggleTask(day, row) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].done = !globalData[key][day][row].done;
-        renderWeek();
-        saveData(true); // Salva subito
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-    }
-}
-
-window.deleteTask = function(e, day, index) {
-    if(e) e.stopPropagation();
-    if(confirm("Eliminare questa riga?")) {
-        const key = getWeekKey();
-        globalData[key][day].splice(index, 1);
-        renderWeek();
-        saveData(true);
-    }
-}
-
-// --- DRAG & DROP ---
-window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
-window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
-window.handleDrop = function(e, targetDay, targetIndex) {
-    e.stopPropagation(); e.preventDefault();
-    if (dragDay === targetDay && dragIndex !== targetIndex) {
-        const key = getWeekKey();
-        const list = globalData[key][targetDay];
-        const [movedItem] = list.splice(dragIndex, 1);
-        list.splice(targetIndex, 0, movedItem);
-        renderWeek(); saveData(true);
-    }
-    return false;
 }
 
 // --- RENDER COMPONENTI ---
@@ -334,6 +267,7 @@ function renderWeek() {
         </div>`;
     }).join('');
 
+    // Dati Extra
     if(globalData.account) {
         if(document.getElementById('stat-sales')) document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
         if(document.getElementById('stat-units')) document.getElementById('stat-units').innerText = globalData.account.units || "0";
@@ -342,54 +276,132 @@ function renderWeek() {
     if(globalData.notes && document.getElementById('general-notes')) document.getElementById('general-notes').innerText = globalData.notes.general || "";
     if(globalData.home && document.getElementById('home-quick-notes')) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
     
+    // Renderizza Call se già scaricate
     if(gcalData.length > 0) renderGoogleEvents();
 }
 
-function renderSidebar() {
-    const key = getWeekKey();
-    const d = globalData[key] || {};
-
-    const callList = document.getElementById('callList');
-    if(callList) {
-        if (!callList.innerHTML.trim() || d.calls) {
-             const inputs = callList.querySelectorAll('input');
-             if(d.calls && inputs.length > 0) {
-                 d.calls.forEach((val, i) => { if(inputs[i]) inputs[i].value = val; });
-             } else if (!callList.innerHTML.trim()) {
-                 let html = ''; for(let i=0;i<8;i++) html+=`<div class="call-row"><input class="sb-input" placeholder="Cliente" oninput="deferredSave()"><input class="sb-input" placeholder="Giorno" oninput="deferredSave()"><input class="sb-input" placeholder="Ora" oninput="deferredSave()"></div>`;
-                 callList.innerHTML = html;
-                 if(d.calls) {
-                     const newInputs = callList.querySelectorAll('input');
-                     d.calls.forEach((val, i) => { if(newInputs[i]) newInputs[i].value = val; });
-                 }
-             }
-        }
-    }
+// --- GOOGLE FETCH (SOLO CALL) ---
+async function fetchGoogle() {
+    let start = new Date(currentMon); 
+    let end = new Date(currentMon); end.setDate(end.getDate() + 5);
     
-    const todoList = document.getElementById('todoList');
-    if(todoList) {
-         if (!todoList.innerHTML.trim() || d.todos) {
-             let html = ''; 
-             const savedTodos = d.todos || [];
-             const savedChecks = d.todoChecks || [];
-             
-             if(savedTodos.length > 0 || !todoList.innerHTML.trim()) {
-                 for(let i=0;i<12;i++) {
-                     const val = savedTodos[i] || '';
-                     const chk = savedChecks[i] ? 'checked' : '';
-                     html+=`<div class="todo-row"><div class="chk ${chk}" onclick="this.classList.toggle('checked'); deferredSave()"></div><input class="sb-input" placeholder="Attività..." value="${val}" oninput="deferredSave()"></div>`;
-                 }
-                 todoList.innerHTML = html;
-             }
-         }
+    try {
+        const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        
+        // Ho rimosso Mail e Drive per leggerezza
+        const [ev1, ev2] = await Promise.all([p1, p2]);
+        
+        gcalData = [...ev1, ...ev2];
+        
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+        renderGoogleEvents();
+
+    } catch(e) { console.error("Google Err:", e); }
+}
+
+function renderGoogleEvents() {
+    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
+    
+    // Pulisci
+    for(let i=1; i<=5; i++) { 
+        const el = document.getElementById(ids[i]);
+        if(el) el.innerHTML = ''; 
+    }
+
+    gcalData.forEach(ev => {
+        const d = new Date(ev.startTime);
+        const dayIdx = d.getDay(); 
+        
+        if(dayIdx >= 1 && dayIdx <= 5) {
+            const container = document.getElementById(ids[dayIdx]);
+            if(container) {
+                const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                let html = '';
+                
+                // Se c'è link è cliccabile
+                if(ev.link && ev.link.length > 5) {
+                    html = `
+                    <a href="${ev.link}" target="_blank" class="gcal-event" title="Apri Call">
+                        <span class="call-badge">CALL</span>
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </a>`;
+                } else {
+                    html = `
+                    <div class="gcal-event" style="cursor:default; background:#F1F5F9; border-left-color:#9CA3AF;">
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </div>`;
+                }
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
+}
+
+// --- FUNZIONI DI SUPPORTO (Drag, Form, Etc) ---
+window.addTaskManually = function(day, val) {
+    const key = getWeekKey();
+    if(!globalData[key]) globalData[key] = {};
+    if(!globalData[key][day]) globalData[key][day] = [];
+    
+    const txt = (typeof val === 'string') ? val : '';
+    const done = (typeof val !== 'string'); 
+    
+    globalData[key][day].push({ txt: txt, done: done });
+    
+    renderWeek();
+    saveData(true); // Salva subito
+}
+
+function updateTask(day, row, val) {
+    const key = getWeekKey();
+    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+        globalData[key][day][row].txt = val;
+        deferredSave();
     }
 }
 
-// --- ALTRE FUNZIONI (Modale, Aziende, ecc...) ---
+function toggleTask(day, row) {
+    const key = getWeekKey();
+    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+        globalData[key][day][row].done = !globalData[key][day][row].done;
+        renderWeek();
+        saveData(true); // Salva subito
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+    }
+}
+
+window.deleteTask = function(e, day, index) {
+    if(e) e.stopPropagation();
+    if(confirm("Eliminare questa riga?")) {
+        const key = getWeekKey();
+        globalData[key][day].splice(index, 1);
+        renderWeek();
+        saveData(true);
+    }
+}
+
+// Drag & Drop
+window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
+window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
+window.handleDrop = function(e, targetDay, targetIndex) {
+    e.stopPropagation(); e.preventDefault();
+    if (dragDay === targetDay && dragIndex !== targetIndex) {
+        const key = getWeekKey();
+        const list = globalData[key][targetDay];
+        const [movedItem] = list.splice(dragIndex, 1);
+        list.splice(targetIndex, 0, movedItem);
+        renderWeek(); saveData(true);
+    }
+    return false;
+}
+
 window.openActivityModal = function() {
     document.getElementById('activityModal').style.display = 'flex';
     const select = document.getElementById('formCompany');
-    if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda</option>';
+    if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda (tasto +)</option>';
     else select.innerHTML = companyList.map((c, i) => `<option value="${i}">${c.name}</option>`).join('');
     const today = new Date().getDay();
     const daysMap = ['mon','mon','tue','wed','thu','fri','mon'];
@@ -415,15 +427,8 @@ window.saveFromForm = function() {
 }
 function renderCompanyButtons() {
     const cont = document.getElementById('companyTagsContainer');
-    if (!companyList.length) {
-        cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
-    } else {
-        cont.innerHTML = companyList.map((c, i) => `
-            <button class="btn-company" oncontextmenu="deleteCompany(event, ${i})">
-                <div class="company-dot" style="background:${c.color}"></div>
-                ${c.name}
-            </button>
-        `).join('');
+    if (!companyList.length) { cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>"; } else {
+        cont.innerHTML = companyList.map((c, i) => `<button class="btn-company" oncontextmenu="deleteCompany(event, ${i})"><div class="company-dot" style="background:${c.color}"></div>${c.name}</button>`).join('');
     }
 }
 window.addNewCompany = function() {
@@ -466,10 +471,11 @@ function renderExternalData() {
         });
     } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
     
+    // Mail e Doc (Vuoti per scelta)
     const mailEl = document.getElementById('mail-list-container');
-    if(googleMixData.email.length) { mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join(''); } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
+    mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Disabilitato</p>';
     const docEl = document.getElementById('docs-list');
-    if(googleMixData.drive.length) { docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join(''); } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
+    docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Disabilitato</p>';
 }
 
 function updateDateDisplay() {
@@ -486,21 +492,3 @@ window.forceSync = function() { document.getElementById('loadingScreen').style.d
 window.toggleTheme = function() { const isDark = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', isDark ? 'light' : 'dark'); localStorage.setItem('theme', isDark ? 'light' : 'dark'); }
 window.fmt = function(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
 function isToday(date) { const t = new Date(); return date.getDate() === t.getDate() && date.getMonth() === t.getMonth(); }
-async function fetchGoogle() {
-    if(GCAL_1.includes("LINK")) return;
-    let start = new Date(currentMon); let end = new Date(currentMon); end.setDate(end.getDate() + 5);
-    try {
-        const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
-        const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
-        gcalData = [...ev1, ...ev2];
-        googleMixData = data;
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-        renderGoogleEvents();
-    } catch(e) { console.log("Google Err", e); }
-}
-function renderGoogleEvents() {
-    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
-}
