@@ -1,15 +1,17 @@
-// --- CONFIGURAZIONE ---
+// --- CONFIGURAZIONE JSONBIN (IL TUO DATABASE) ---
 const PWD = "giuseppe90";
-const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
+const BIN_ID = "695e8223d0ea881f405b10f2";
+const API_KEY = "$2a$10$/b3gwPG1OcyJYyOgtNM.iujzuvPXS5bPnyJvDz5UI9StDI.nQFMQG";
+const URL_BIN = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-// LINK GOOGLE SCRIPT (Assicurati che siano quelli aggiornati e funzionanti)
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec"; // CallForUs
-const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec"; // GearXPro
+// LINK GOOGLE SCRIPT
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
+const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
 
 // Rilevamento Test/Live
 const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "";
-const BASKET = isLocal ? "Dashboard_TEST_FINAL_V2" : "Dashboard_FINAL_V2"; 
-const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET}`;
+// JSONBin non usa "basket" diversi con lo stesso ID, usiamo una proprietà interna o ignoriamo per ora
+// Per sicurezza in locale salviamo comunque, ma sappi che sovrascrive il BIN unico che hai fornito.
 
 const DEFAULT_COMPANIES = [];
 
@@ -17,7 +19,8 @@ const DEFAULT_COMPANIES = [];
 let currentMon = getRealMonday();
 let globalData = {};
 let companyList = [];
-let gcalData = []; // Solo dati calendario
+let gcalData = []; 
+let googleMixData = { email: [], drive: [] };
 let saveTimer;
 let lastDayFocus = null; 
 let isDataLoaded = false;
@@ -48,8 +51,10 @@ function tryLogin() {
 function initApp() {
     document.getElementById('app').style.display='grid';
     document.getElementById('loadingScreen').style.display='flex';
-    document.getElementById('loadingText').innerText = "Caricamento...";
-    
+    // Testo corretto per capire cosa sta facendo
+    const loadingText = document.querySelector('#loadingScreen p');
+    if(loadingText) loadingText.innerText = "Connessione JSONBin...";
+
     if (isLocal) {
         const status = document.getElementById('syncStatus');
         status.innerText = "TEST MODE"; 
@@ -66,16 +71,22 @@ function initApp() {
     });
 
     updateDateDisplay();
+    
+    // Avvia caricamento
     loadData(false);
     
-    // Timeout sicurezza
+    // Timeout sicurezza: se JSONBin non risponde in 5 sec, sblocca
     setTimeout(() => { 
         if (!isDataLoaded) { 
             document.getElementById('loadingScreen').style.display = 'none'; 
             isDataLoaded = true; 
             setStatus('Recupero...', 'ok'); 
+            // Inizializza vuoto se fallisce
+            renderWeek();
+            renderSidebar();
         } 
     }, 5000);
+    
     setInterval(() => loadData(true), 300000); 
 }
 
@@ -103,14 +114,22 @@ function setStatus(msg, type) {
     el.className = `status-badge status-${type}`;
 }
 
-// --- CARICAMENTO DATI ---
+// --- CARICAMENTO DATI (JSONBIN) ---
 async function loadData(silent) {
     if(!silent) setStatus('Sync...', 'wait');
     try {
-        const res = await fetch(PANTRY_URL + "?t=" + Date.now(), { cache: "no-store" });
+        const res = await fetch(URL_BIN, {
+            method: 'GET',
+            headers: {
+                'X-Master-Key': API_KEY,
+                'Cache-Control': 'no-cache'
+            }
+        });
+
         if(res.ok) {
             const json = await res.json();
-            globalData = json || {};
+            // JSONBin mette i dati dentro .record
+            globalData = json.record || {};
             
             companyList = globalData.COMPANIES || DEFAULT_COMPANIES;
             renderCompanyButtons();
@@ -118,7 +137,6 @@ async function loadData(silent) {
             renderWeek();     
             renderSidebar();
             
-            // Scarica Google (SOLO CALENDARIO)
             fetchGoogle();
             
             isDataLoaded = true;
@@ -127,81 +145,137 @@ async function loadData(silent) {
 
             if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
+             console.log("Errore JSONBin o Bin Vuoto");
              isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
              renderWeek();
              renderSidebar();
         }
     } catch(e) { 
+        console.error(e);
         if(!silent) setStatus('Offline', 'wait'); 
         isDataLoaded = true; 
         document.getElementById('loadingScreen').style.display='none';
     }
 }
 
-// --- GOOGLE FETCH (SOLO CALENDARIO) ---
-async function fetchGoogle() {
-    let start = new Date(currentMon); 
-    let end = new Date(currentMon); end.setDate(end.getDate() + 5);
-    
-    try {
-        console.log("Fetching Google...");
-        // Scarica Calendari da entrambi gli script
-        const pCal1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const pCal2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        
-        const [ev1, ev2] = await Promise.all([pCal1, pCal2]);
-
-        // Unisci i dati
-        gcalData = [...(Array.isArray(ev1)?ev1:[]), ...(Array.isArray(ev2)?ev2:[])];
-        
-        console.log("Events loaded:", gcalData.length);
-
-        // Renderizza
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-        renderGoogleEvents();
-
-    } catch(e) { console.error("Google Sync Error:", e); }
+// --- SALVATAGGIO (JSONBIN - PUT) ---
+function deferredSave() {
+    if(!isDataLoaded) return;
+    setStatus('Scrivendo...', 'wait');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveData(false), 2000);
 }
 
-function renderGoogleEvents() {
-    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-    
-    // Pulisci
-    for(let i=1; i<=5; i++) { 
-        const el = document.getElementById(ids[i]);
-        if(el) el.innerHTML = ''; 
-    }
+window.manualSave = function() { saveData(true); }
 
-    gcalData.forEach(ev => {
-        const d = new Date(ev.startTime);
-        const dayIdx = d.getDay(); 
-        
-        if(dayIdx >= 1 && dayIdx <= 5) {
-            const container = document.getElementById(ids[dayIdx]);
-            if(container) {
-                const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                let html = '';
-                
-                // Se c'è link è cliccabile
-                if(ev.link && ev.link.length > 5) {
-                    html = `
-                    <a href="${ev.link}" target="_blank" class="gcal-event" title="${ev.title}">
-                        <span class="call-badge">CALL</span>
-                        <span style="font-weight:700; margin-right:5px;">${time}</span>
-                        ${ev.title}
-                    </a>`;
-                } else {
-                    html = `
-                    <div class="gcal-event" style="cursor:default; background:#F3F4F6; border-left-color:#9CA3AF;">
-                        <span style="font-weight:700; margin-right:5px;">${time}</span>
-                        ${ev.title}
-                    </div>`;
-                }
-                container.insertAdjacentHTML('beforeend', html);
-            }
-        }
-    });
+async function saveData(immediate) {
+    if(!isDataLoaded) return;
+    if(immediate) clearTimeout(saveTimer);
+    
+    setStatus('Salvataggio...', 'wait');
+    
+    const key = getWeekKey();
+    
+    // Salva Sidebar (Call e Todo)
+    const callInputs = Array.from(document.querySelectorAll('#callList input')).map(i => i.value);
+    const todoInputs = Array.from(document.querySelectorAll('#todoList input.sb-input')).map(i => i.value);
+    const todoChecks = Array.from(document.querySelectorAll('#todoList .chk')).map(c => c.classList.contains('checked'));
+    
+    if(!globalData[key]) globalData[key] = {};
+    globalData[key].calls = callInputs;
+    globalData[key].todos = todoInputs;
+    globalData[key].todoChecks = todoChecks;
+
+    // Salva Account e Note
+    if(document.getElementById('stat-sales')) {
+        globalData.account = {
+            sales: document.getElementById('stat-sales').innerText,
+            units: document.getElementById('stat-units').innerText,
+            notes: document.getElementById('account-notes').innerText
+        };
+    }
+    if(document.getElementById('general-notes')) {
+        globalData.notes = { general: document.getElementById('general-notes').innerText };
+    }
+    if(document.getElementById('home-quick-notes')) {
+        globalData.home = { quick: document.getElementById('home-quick-notes').value };
+    }
+    globalData.COMPANIES = companyList;
+
+    try {
+        await fetch(URL_BIN, { 
+            method: 'PUT', 
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': API_KEY
+            }, 
+            body: JSON.stringify(globalData)
+        });
+        setStatus('Salvato', 'ok');
+    } catch(e) { 
+        setStatus('Errore Save', 'err'); 
+        console.error(e);
+    }
+}
+
+// --- GESTIONE TASK E SPUNTE ---
+
+window.addTaskManually = function(day, val) {
+    const key = getWeekKey();
+    if(!globalData[key]) globalData[key] = {};
+    if(!globalData[key][day]) globalData[key][day] = [];
+    
+    const txt = (typeof val === 'string') ? val : '';
+    const done = (typeof val !== 'string'); 
+    
+    globalData[key][day].push({ txt: txt, done: done });
+    
+    renderWeek();
+    saveData(true); // Salva subito
+}
+
+function updateTask(day, row, val) {
+    const key = getWeekKey();
+    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+        globalData[key][day][row].txt = val;
+        deferredSave();
+    }
+}
+
+function toggleTask(day, row) {
+    const key = getWeekKey();
+    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+        globalData[key][day][row].done = !globalData[key][day][row].done;
+        renderWeek();
+        saveData(true); // Salva subito
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+    }
+}
+
+window.deleteTask = function(e, day, index) {
+    if(e) e.stopPropagation();
+    if(confirm("Eliminare questa riga?")) {
+        const key = getWeekKey();
+        globalData[key][day].splice(index, 1);
+        renderWeek();
+        saveData(true);
+    }
+}
+
+// --- DRAG & DROP ---
+window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
+window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
+window.handleDrop = function(e, targetDay, targetIndex) {
+    e.stopPropagation(); e.preventDefault();
+    if (dragDay === targetDay && dragIndex !== targetIndex) {
+        const key = getWeekKey();
+        const list = globalData[key][targetDay];
+        const [movedItem] = list.splice(dragIndex, 1);
+        list.splice(targetIndex, 0, movedItem);
+        renderWeek(); saveData(true);
+    }
+    return false;
 }
 
 // --- RENDER COMPONENTI ---
@@ -311,65 +385,7 @@ function renderSidebar() {
     }
 }
 
-// --- FUNZIONI DATI ---
-window.addTaskManually = function(day, val) {
-    const key = getWeekKey();
-    if(!globalData[key]) globalData[key] = {};
-    if(!globalData[key][day]) globalData[key][day] = [];
-    
-    const txt = (typeof val === 'string') ? val : '';
-    const done = (typeof val !== 'string'); 
-    
-    globalData[key][day].push({ txt: txt, done: done });
-    
-    renderWeek();
-    saveData(true);
-}
-
-function updateTask(day, row, val) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].txt = val;
-        deferredSave();
-    }
-}
-
-function toggleTask(day, row) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].done = !globalData[key][day][row].done;
-        renderWeek();
-        saveData(true); 
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-    }
-}
-
-window.deleteTask = function(e, day, index) {
-    if(e) e.stopPropagation();
-    if(confirm("Eliminare questa riga?")) {
-        const key = getWeekKey();
-        globalData[key][day].splice(index, 1);
-        renderWeek();
-        saveData(true);
-    }
-}
-
-// Drag & Drop
-window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
-window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
-window.handleDrop = function(e, targetDay, targetIndex) {
-    e.stopPropagation(); e.preventDefault();
-    if (dragDay === targetDay && dragIndex !== targetIndex) {
-        const key = getWeekKey();
-        const list = globalData[key][targetDay];
-        const [movedItem] = list.splice(dragIndex, 1);
-        list.splice(targetIndex, 0, movedItem);
-        renderWeek(); saveData(true);
-    }
-    return false;
-}
-
-// --- ALTRE FUNZIONI ---
+// --- ALTRE FUNZIONI (Modale, Aziende, ecc...) ---
 window.openActivityModal = function() {
     document.getElementById('activityModal').style.display = 'flex';
     const select = document.getElementById('formCompany');
@@ -399,8 +415,15 @@ window.saveFromForm = function() {
 }
 function renderCompanyButtons() {
     const cont = document.getElementById('companyTagsContainer');
-    if (!companyList.length) { cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>"; } else {
-        cont.innerHTML = companyList.map((c, i) => `<button class="btn-company" oncontextmenu="deleteCompany(event, ${i})"><div class="company-dot" style="background:${c.color}"></div>${c.name}</button>`).join('');
+    if (!companyList.length) {
+        cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
+    } else {
+        cont.innerHTML = companyList.map((c, i) => `
+            <button class="btn-company" oncontextmenu="deleteCompany(event, ${i})">
+                <div class="company-dot" style="background:${c.color}"></div>
+                ${c.name}
+            </button>
+        `).join('');
     }
 }
 window.addNewCompany = function() {
@@ -443,12 +466,10 @@ function renderExternalData() {
         });
     } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
     
-    // Placeholder per mail e doc (rimossi per leggerezza)
     const mailEl = document.getElementById('mail-list-container');
-    mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Disabilitato</p>';
-    
+    if(googleMixData.email.length) { mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join(''); } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
     const docEl = document.getElementById('docs-list');
-    docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Disabilitato</p>';
+    if(googleMixData.drive.length) { docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join(''); } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
 }
 
 function updateDateDisplay() {
@@ -465,3 +486,21 @@ window.forceSync = function() { document.getElementById('loadingScreen').style.d
 window.toggleTheme = function() { const isDark = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', isDark ? 'light' : 'dark'); localStorage.setItem('theme', isDark ? 'light' : 'dark'); }
 window.fmt = function(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
 function isToday(date) { const t = new Date(); return date.getDate() === t.getDate() && date.getMonth() === t.getMonth(); }
+async function fetchGoogle() {
+    if(GCAL_1.includes("LINK")) return;
+    let start = new Date(currentMon); let end = new Date(currentMon); end.setDate(end.getDate() + 5);
+    try {
+        const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
+        const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
+        gcalData = [...ev1, ...ev2];
+        googleMixData = data;
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+        renderGoogleEvents();
+    } catch(e) { console.log("Google Err", e); }
+}
+function renderGoogleEvents() {
+    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
+    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
+}
