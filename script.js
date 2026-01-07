@@ -2,13 +2,13 @@
 const PWD = "giuseppe90";
 const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
 
-// LINK GOOGLE SCRIPT (I tuoi link)
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
-const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
+// LINK GOOGLE SCRIPT (Assicurati che siano quelli aggiornati e funzionanti)
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec"; // CallForUs
+const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec"; // GearXPro
 
 // Rilevamento Test/Live
 const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "";
-const BASKET = isLocal ? "Dashboard_TEST_BACK" : "Dashboard_FINAL_BACK"; 
+const BASKET = isLocal ? "Dashboard_TEST_FINAL_V2" : "Dashboard_FINAL_V2"; 
 const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET}`;
 
 const DEFAULT_COMPANIES = [];
@@ -17,8 +17,7 @@ const DEFAULT_COMPANIES = [];
 let currentMon = getRealMonday();
 let globalData = {};
 let companyList = [];
-let gcalData = []; 
-let googleMixData = { email: [], drive: [] };
+let gcalData = []; // Solo dati calendario
 let saveTimer;
 let lastDayFocus = null; 
 let isDataLoaded = false;
@@ -49,7 +48,7 @@ function tryLogin() {
 function initApp() {
     document.getElementById('app').style.display='grid';
     document.getElementById('loadingScreen').style.display='flex';
-    document.getElementById('loadingText').innerText = "Connessione Pantry...";
+    document.getElementById('loadingText').innerText = "Caricamento...";
     
     if (isLocal) {
         const status = document.getElementById('syncStatus');
@@ -70,7 +69,13 @@ function initApp() {
     loadData(false);
     
     // Timeout sicurezza
-    setTimeout(() => { if (!isDataLoaded) { document.getElementById('loadingScreen').style.display = 'none'; isDataLoaded = true; setStatus('Recupero...', 'ok'); } }, 6000);
+    setTimeout(() => { 
+        if (!isDataLoaded) { 
+            document.getElementById('loadingScreen').style.display = 'none'; 
+            isDataLoaded = true; 
+            setStatus('Recupero...', 'ok'); 
+        } 
+    }, 5000);
     setInterval(() => loadData(true), 300000); 
 }
 
@@ -98,20 +103,22 @@ function setStatus(msg, type) {
     el.className = `status-badge status-${type}`;
 }
 
-// --- CARICAMENTO DATI (TORNATO A PANTRY) ---
+// --- CARICAMENTO DATI ---
 async function loadData(silent) {
     if(!silent) setStatus('Sync...', 'wait');
     try {
         const res = await fetch(PANTRY_URL + "?t=" + Date.now(), { cache: "no-store" });
         if(res.ok) {
             const json = await res.json();
-            globalData = json || {}; // Pantry ritorna direttamente l'oggetto
+            globalData = json || {};
             
             companyList = globalData.COMPANIES || DEFAULT_COMPANIES;
             renderCompanyButtons();
             
             renderWeek();     
+            renderSidebar();
             
+            // Scarica Google (SOLO CALENDARIO)
             fetchGoogle();
             
             isDataLoaded = true;
@@ -120,10 +127,10 @@ async function loadData(silent) {
 
             if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
-             // DB Nuovo
              isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
              renderWeek();
+             renderSidebar();
         }
     } catch(e) { 
         if(!silent) setStatus('Offline', 'wait'); 
@@ -132,55 +139,179 @@ async function loadData(silent) {
     }
 }
 
-// --- SALVATAGGIO (TORNATO A PANTRY - POST) ---
-function deferredSave() {
-    if(!isDataLoaded) return;
-    setStatus('Scrivendo...', 'wait');
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveData(false), 2000);
-}
-
-window.manualSave = function() { saveData(true); }
-
-async function saveData(immediate) {
-    if(!isDataLoaded) return;
-    if(immediate) clearTimeout(saveTimer);
+// --- GOOGLE FETCH (SOLO CALENDARIO) ---
+async function fetchGoogle() {
+    let start = new Date(currentMon); 
+    let end = new Date(currentMon); end.setDate(end.getDate() + 5);
     
-    setStatus('Salvataggio...', 'wait');
-    
-    const key = getWeekKey();
-    
-    // Salva Dati
-    if(document.getElementById('stat-sales')) {
-        globalData.account = {
-            sales: document.getElementById('stat-sales').innerText,
-            units: document.getElementById('stat-units').innerText,
-            notes: document.getElementById('account-notes').innerText
-        };
-    }
-    if(document.getElementById('general-notes')) {
-        globalData.notes = { general: document.getElementById('general-notes').innerText };
-    }
-    if(document.getElementById('home-quick-notes')) {
-        globalData.home = { quick: document.getElementById('home-quick-notes').value };
-    }
-    globalData.COMPANIES = companyList;
-
     try {
-        // Pantry usa POST
-        await fetch(PANTRY_URL, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(globalData)
-        });
-        setStatus('Salvato', 'ok');
-    } catch(e) { 
-        setStatus('Errore Save', 'err'); 
+        console.log("Fetching Google...");
+        // Scarica Calendari da entrambi gli script
+        const pCal1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        const pCal2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        
+        const [ev1, ev2] = await Promise.all([pCal1, pCal2]);
+
+        // Unisci i dati
+        gcalData = [...(Array.isArray(ev1)?ev1:[]), ...(Array.isArray(ev2)?ev2:[])];
+        
+        console.log("Events loaded:", gcalData.length);
+
+        // Renderizza
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+        renderGoogleEvents();
+
+    } catch(e) { console.error("Google Sync Error:", e); }
+}
+
+function renderGoogleEvents() {
+    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
+    
+    // Pulisci
+    for(let i=1; i<=5; i++) { 
+        const el = document.getElementById(ids[i]);
+        if(el) el.innerHTML = ''; 
+    }
+
+    gcalData.forEach(ev => {
+        const d = new Date(ev.startTime);
+        const dayIdx = d.getDay(); 
+        
+        if(dayIdx >= 1 && dayIdx <= 5) {
+            const container = document.getElementById(ids[dayIdx]);
+            if(container) {
+                const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                let html = '';
+                
+                // Se c'è link è cliccabile
+                if(ev.link && ev.link.length > 5) {
+                    html = `
+                    <a href="${ev.link}" target="_blank" class="gcal-event" title="${ev.title}">
+                        <span class="call-badge">CALL</span>
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </a>`;
+                } else {
+                    html = `
+                    <div class="gcal-event" style="cursor:default; background:#F3F4F6; border-left-color:#9CA3AF;">
+                        <span style="font-weight:700; margin-right:5px;">${time}</span>
+                        ${ev.title}
+                    </div>`;
+                }
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
+}
+
+// --- RENDER COMPONENTI ---
+function renderWeek() {
+    const key = getWeekKey();
+    const d = globalData[key] || {};
+    const days = ['mon','tue','wed','thu','fri'];
+    const labels = ['LUN','MAR','MER','GIO','VEN'];
+    const todayIdx = new Date().getDay(); 
+
+    const calContainer = document.getElementById('calendar-days');
+    
+    calContainer.innerHTML = days.map((dayCode, i) => {
+        const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
+        
+        let rowsHtml = dayData.map((task, idx) => {
+            if(task.isHeader) {
+                return `
+                <div class="task-row header-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
+                    <span class="material-icons-round drag-handle">drag_indicator</span>
+                    <span class="client-tag" style="background:${task.tag.bg}; color:${task.tag.col}; border-color:${task.tag.bd}; width:100%; display:block; text-align:center;">${task.tag.name}</span>
+                    <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
+                </div>`;
+            } else {
+                const checked = task.done ? 'checked' : '';
+                const completedClass = task.done ? 'completed' : '';
+                return `
+                <div class="task-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
+                    <span class="material-icons-round drag-handle">drag_indicator</span>
+                    <div class="task-chk ${checked}" onclick="toggleTask('${dayCode}', ${idx})"></div>
+                    <input type="text" class="task-text ${completedClass}" value="${task.txt}" oninput="updateTask('${dayCode}', ${idx}, this.value)">
+                    <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
+                </div>`;
+            }
+        }).join('');
+
+        const emptySlots = Math.max(0, 5 - dayData.length);
+        for(let e=0; e<emptySlots; e++) {
+             rowsHtml += `
+            <div class="task-row">
+                <span class="material-icons-round drag-handle" style="opacity:0.1">drag_indicator</span>
+                <div class="task-chk" onclick="addTaskManually('${dayCode}')"></div>
+                <input type="text" class="task-text" placeholder="..." onchange="addTaskManually('${dayCode}', this.value)">
+            </div>`;
+        }
+
+        const isTodayClass = (todayIdx === i+1) ? 'current-day' : '';
+
+        return `
+        <div class="day-col ${isTodayClass}">
+            <div class="day-head">${labels[i]}</div>
+            <div class="gcal-wrapper" id="${dayCode}-gcal"></div>
+            <div class="day-body" id="${dayCode}">
+                ${rowsHtml}
+            </div>
+        </div>`;
+    }).join('');
+
+    if(globalData.account) {
+        if(document.getElementById('stat-sales')) document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
+        if(document.getElementById('stat-units')) document.getElementById('stat-units').innerText = globalData.account.units || "0";
+        if(document.getElementById('account-notes')) document.getElementById('account-notes').innerText = globalData.account.notes || "";
+    }
+    if(globalData.notes && document.getElementById('general-notes')) document.getElementById('general-notes').innerText = globalData.notes.general || "";
+    if(globalData.home && document.getElementById('home-quick-notes')) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
+    
+    if(gcalData.length > 0) renderGoogleEvents();
+}
+
+function renderSidebar() {
+    const key = getWeekKey();
+    const d = globalData[key] || {};
+
+    const callList = document.getElementById('callList');
+    if(callList) {
+        if (!callList.innerHTML.trim() || d.calls) {
+             const inputs = callList.querySelectorAll('input');
+             if(d.calls && inputs.length > 0) {
+                 d.calls.forEach((val, i) => { if(inputs[i]) inputs[i].value = val; });
+             } else if (!callList.innerHTML.trim()) {
+                 let html = ''; for(let i=0;i<8;i++) html+=`<div class="call-row"><input class="sb-input" placeholder="Cliente" oninput="deferredSave()"><input class="sb-input" placeholder="Giorno" oninput="deferredSave()"><input class="sb-input" placeholder="Ora" oninput="deferredSave()"></div>`;
+                 callList.innerHTML = html;
+                 if(d.calls) {
+                     const newInputs = callList.querySelectorAll('input');
+                     d.calls.forEach((val, i) => { if(newInputs[i]) newInputs[i].value = val; });
+                 }
+             }
+        }
+    }
+    
+    const todoList = document.getElementById('todoList');
+    if(todoList) {
+         if (!todoList.innerHTML.trim() || d.todos) {
+             let html = ''; 
+             const savedTodos = d.todos || [];
+             const savedChecks = d.todoChecks || [];
+             
+             if(savedTodos.length > 0 || !todoList.innerHTML.trim()) {
+                 for(let i=0;i<12;i++) {
+                     const val = savedTodos[i] || '';
+                     const chk = savedChecks[i] ? 'checked' : '';
+                     html+=`<div class="todo-row"><div class="chk ${chk}" onclick="this.classList.toggle('checked'); deferredSave()"></div><input class="sb-input" placeholder="Attività..." value="${val}" oninput="deferredSave()"></div>`;
+                 }
+                 todoList.innerHTML = html;
+             }
+         }
     }
 }
 
-// --- GESTIONE TASK ---
-
+// --- FUNZIONI DATI ---
 window.addTaskManually = function(day, val) {
     const key = getWeekKey();
     if(!globalData[key]) globalData[key] = {};
@@ -208,7 +339,7 @@ function toggleTask(day, row) {
     if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
         globalData[key][day][row].done = !globalData[key][day][row].done;
         renderWeek();
-        saveData(true); // Salva subito
+        saveData(true); 
         if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
     }
 }
@@ -293,7 +424,7 @@ function renderHomeWidgets() {
         if(activeTasks.length > 0) {
             homeTasksEl.innerHTML = activeTasks.map((t, i) => {
                 const realIdx = tasks.indexOf(t);
-                return `<div class="task-row" style="border-bottom:1px solid #f0f0f0;"><div class="task-chk ${t.done?'checked':''}" onclick="toggleTask('${dayCode}', ${realIdx});"></div><span style="font-size:13px; ${t.done?'text-decoration:line-through; color:#aaa':''}">${t.txt}</span></div>`;
+                return `<div class="task-row" style="border-bottom:1px solid #f0f0f0;"><div class="task-chk ${t.done?'checked':''}" onclick="toggleTask('${dayCode}', ${realIdx}); renderHomeWidgets();"></div><span style="font-size:13px; ${t.done?'text-decoration:line-through; color:#aaa':''}">${t.txt}</span></div>`;
             }).join('');
         } else { homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Nessuna attività oggi.</p>'; }
     } else { homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Buon Weekend!</p>'; }
@@ -312,78 +443,12 @@ function renderExternalData() {
         });
     } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
     
+    // Placeholder per mail e doc (rimossi per leggerezza)
     const mailEl = document.getElementById('mail-list-container');
-    if(googleMixData.email.length) { mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join(''); } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
+    mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Disabilitato</p>';
     
     const docEl = document.getElementById('docs-list');
-    if(googleMixData.drive.length) { docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join(''); } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
-}
-
-function renderWeek() {
-    const key = getWeekKey();
-    const d = globalData[key] || {};
-    const days = ['mon','tue','wed','thu','fri'];
-    const labels = ['LUN','MAR','MER','GIO','VEN'];
-    const todayIdx = new Date().getDay(); 
-
-    const calContainer = document.getElementById('calendar-days');
-    
-    calContainer.innerHTML = days.map((dayCode, i) => {
-        const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
-        
-        let rowsHtml = dayData.map((task, idx) => {
-            if(task.isHeader) {
-                return `
-                <div class="task-row header-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
-                    <span class="material-icons-round drag-handle">drag_indicator</span>
-                    <span class="client-tag" style="background:${task.tag.bg}; color:${task.tag.col}; border-color:${task.tag.bd}; width:100%; display:block; text-align:center;">${task.tag.name}</span>
-                    <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
-                </div>`;
-            } else {
-                const checked = task.done ? 'checked' : '';
-                const completedClass = task.done ? 'completed' : '';
-                return `
-                <div class="task-row" draggable="true" ondragstart="handleDragStart(event, '${dayCode}', ${idx})" ondragover="handleDragOver(event)" ondrop="handleDrop(event, '${dayCode}', ${idx})">
-                    <span class="material-icons-round drag-handle">drag_indicator</span>
-                    <div class="task-chk ${checked}" onclick="toggleTask('${dayCode}', ${idx})"></div>
-                    <input type="text" class="task-text ${completedClass}" value="${task.txt}" oninput="updateTask('${dayCode}', ${idx}, this.value)">
-                    <span class="material-icons-round delete-btn" onclick="deleteTask(event, '${dayCode}', ${idx})">delete</span>
-                </div>`;
-            }
-        }).join('');
-
-        const emptySlots = Math.max(0, 5 - dayData.length);
-        for(let e=0; e<emptySlots; e++) {
-             rowsHtml += `
-            <div class="task-row">
-                <span class="material-icons-round drag-handle" style="opacity:0.1">drag_indicator</span>
-                <div class="task-chk" onclick="addTaskManually('${dayCode}')"></div>
-                <input type="text" class="task-text" placeholder="..." onchange="addTaskManually('${dayCode}', this.value)">
-            </div>`;
-        }
-
-        const isTodayClass = (todayIdx === i+1) ? 'current-day' : '';
-
-        return `
-        <div class="day-col ${isTodayClass}">
-            <div class="day-head">${labels[i]}</div>
-            <div class="gcal-wrapper" id="${dayCode}-gcal"></div>
-            <div class="day-body" id="${dayCode}">
-                ${rowsHtml}
-            </div>
-        </div>`;
-    }).join('');
-
-    // Dati Extra
-    if(globalData.account) {
-        if(document.getElementById('stat-sales')) document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
-        if(document.getElementById('stat-units')) document.getElementById('stat-units').innerText = globalData.account.units || "0";
-        if(document.getElementById('account-notes')) document.getElementById('account-notes').innerText = globalData.account.notes || "";
-    }
-    if(globalData.notes && document.getElementById('general-notes')) document.getElementById('general-notes').innerText = globalData.notes.general || "";
-    if(globalData.home && document.getElementById('home-quick-notes')) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
-    
-    if(gcalData.length > 0) renderGoogleEvents();
+    docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Disabilitato</p>';
 }
 
 function updateDateDisplay() {
@@ -400,21 +465,3 @@ window.forceSync = function() { document.getElementById('loadingScreen').style.d
 window.toggleTheme = function() { const isDark = document.body.getAttribute('data-theme') === 'dark'; document.body.setAttribute('data-theme', isDark ? 'light' : 'dark'); localStorage.setItem('theme', isDark ? 'light' : 'dark'); }
 window.fmt = function(cmd) { document.execCommand(cmd, false, null); deferredSave(); }
 function isToday(date) { const t = new Date(); return date.getDate() === t.getDate() && date.getMonth() === t.getMonth(); }
-async function fetchGoogle() {
-    if(GCAL_1.includes("LINK")) return;
-    let start = new Date(currentMon); let end = new Date(currentMon); end.setDate(end.getDate() + 5);
-    try {
-        const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
-        const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
-        gcalData = [...ev1, ...ev2];
-        googleMixData = data;
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-        renderGoogleEvents();
-    } catch(e) { console.log("Google Err", e); }
-}
-function renderGoogleEvents() {
-    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
-}
