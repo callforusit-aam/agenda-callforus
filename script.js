@@ -1,19 +1,15 @@
 // --- CONFIGURAZIONE JSONBIN ---
 const PWD = "giuseppe90";
+const BIN_ID = "695e8223d0ea881f405b10f2";
+const API_KEY = "$2a$10$/b3gwPG1OcyJYyOgtNM.iujzuvPXS5bPnyJvDz5UI9StDI.nQFMQG";
+const URL_BIN = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-// ⚠️ INSERISCI I TUOI DATI JSONBIN QUI ⚠️
-const BIN_ID = "695e8223d0ea881f405b10f2";       // Es: 659d...
-const API_KEY = "$2a$10$/b3gwPG1OcyJYyOgtNM.iujzuvPXS5bPnyJvDz5UI9StDI.nQFMQG";  // Es: $2a$10...
-
-// Link Google Script (i tuoi)
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
+// LINK GOOGLE SCRIPT
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbxB9o4nTJpwgKKdYaCkHtjSTu7SeQsMvUPd-xiXbrXOBgXxkc_X9HjtrUdCxZ2Cs_FS/exec";
 const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
 
-// --- SETUP ---
-const URL_BIN = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-const DEFAULT_COMPANIES = [];
-
 // --- STATO ---
+const DEFAULT_COMPANIES = [];
 let currentMon = getRealMonday();
 let globalData = {};
 let companyList = [];
@@ -50,7 +46,7 @@ function initApp() {
     document.getElementById('app').style.display='grid';
     document.getElementById('loadingScreen').style.display='flex';
     document.getElementById('loadingText').innerText = "Connessione JSONBin...";
-    
+
     if(localStorage.getItem('theme') === 'dark') document.body.setAttribute('data-theme', 'dark');
     
     document.addEventListener('focusin', e => { 
@@ -63,16 +59,8 @@ function initApp() {
     loadData(false);
     
     // Timeout sicurezza
-    setTimeout(() => { 
-        if (!isDataLoaded) { 
-            document.getElementById('loadingScreen').style.display = 'none'; 
-            isDataLoaded = true; 
-            setStatus('Recupero...', 'ok');
-            renderWeek(); 
-        } 
-    }, 6000);
-    
-    setInterval(() => loadData(true), 300000); 
+    setTimeout(() => { if (!isDataLoaded) { document.getElementById('loadingScreen').style.display = 'none'; isDataLoaded = true; setStatus('Recupero...', 'ok'); } }, 6000);
+    setInterval(() => loadData(true), 300000); // 5 min sync
 }
 
 function nav(page) {
@@ -112,14 +100,13 @@ async function loadData(silent) {
 
         if(res.ok) {
             const json = await res.json();
-            // JSONBin restituisce i dati dentro la proprietà .record
+            // JSONBin restituisce i dati dentro .record
             globalData = json.record || {};
             
             companyList = globalData.COMPANIES || DEFAULT_COMPANIES;
             renderCompanyButtons();
             
             renderWeek();     
-            renderSidebar(); 
             
             fetchGoogle();
             
@@ -129,29 +116,42 @@ async function loadData(silent) {
 
             if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
-             // Errore Chiavi o Bin non trovato
-             console.error("Errore JSONBin:", res.status);
-             isDataLoaded = true; 
+             console.log("Errore JSONBin o Bin Nuovo");
+             isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
              renderWeek();
         }
     } catch(e) { 
         if(!silent) setStatus('Offline', 'wait'); 
         isDataLoaded = true; 
-        document.getElementById('loadingScreen').style.display='none'; 
+        document.getElementById('loadingScreen').style.display='none';
     }
 }
 
-// --- SALVATAGGIO DATI (JSONBIN) ---
+// --- SALVATAGGIO (JSONBIN) ---
+function deferredSave() {
+    if(!isDataLoaded) return;
+    setStatus('Scrivendo...', 'wait');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveData(false), 2000);
+}
+
+window.manualSave = function() { saveData(true); }
+
 async function saveData(immediate) {
     if(!isDataLoaded) return;
     if(immediate) clearTimeout(saveTimer);
     
     setStatus('Salvataggio...', 'wait');
     
-    const key = getWeekKey();
+    // NOTA: globalData è mantenuto aggiornato dalle funzioni di input (updateTask, toggleTask)
+    // Qui aggiorniamo solo i campi globali che non hanno listener diretti sull'array
     
-    // Recupero dati extra dal DOM
+    const key = getWeekKey();
+    // Assicuriamoci che l'oggetto settimanale esista
+    if(!globalData[key]) globalData[key] = {};
+
+    // Salva Account e Note
     if(document.getElementById('stat-sales')) {
         globalData.account = {
             sales: document.getElementById('stat-sales').innerText,
@@ -168,7 +168,6 @@ async function saveData(immediate) {
     globalData.COMPANIES = companyList;
 
     try {
-        // JSONBin usa PUT per aggiornare
         await fetch(URL_BIN, { 
             method: 'PUT', 
             headers: {
@@ -180,19 +179,61 @@ async function saveData(immediate) {
         setStatus('Salvato', 'ok');
     } catch(e) { 
         setStatus('Errore Save', 'err'); 
+        console.error(e);
     }
 }
 
-function deferredSave() {
-    if(!isDataLoaded) return;
-    setStatus('Scrivendo...', 'wait');
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveData(false), 2000);
+// --- GESTIONE TASK E SPUNTE ---
+
+// 1. Aggiungi manuale (da riga vuota)
+window.addTaskManually = function(day, val) {
+    const key = getWeekKey();
+    if(!globalData[key]) globalData[key] = {};
+    if(!globalData[key][day]) globalData[key][day] = [];
+    
+    const txt = (typeof val === 'string') ? val : '';
+    const done = (typeof val !== 'string'); // Se click su check, nasce fatta
+    
+    globalData[key][day].push({ txt: txt, done: done });
+    
+    renderWeek();
+    saveData(true); // Salva subito
 }
 
-window.manualSave = function() { saveData(true); }
+// 2. Aggiorna testo
+function updateTask(day, row, val) {
+    const key = getWeekKey();
+    if(!globalData[key] || !globalData[key][day] || !globalData[key][day][row]) return;
+    globalData[key][day][row].txt = val;
+    deferredSave();
+}
 
-// --- RENDER COMPONENTI ---
+// 3. Toggle Spunta (FIX: Aggiorna memoria e salva subito)
+function toggleTask(day, row) {
+    const key = getWeekKey();
+    if(!globalData[key] || !globalData[key][day] || !globalData[key][day][row]) return;
+    
+    // Inverti stato
+    globalData[key][day][row].done = !globalData[key][day][row].done;
+    
+    renderWeek();
+    saveData(true); // Salvataggio Immediato
+    
+    if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+}
+
+// 4. Elimina
+window.deleteTask = function(e, day, index) {
+    if(e) e.stopPropagation();
+    if(confirm("Eliminare questa riga?")) {
+        const key = getWeekKey();
+        globalData[key][day].splice(index, 1);
+        renderWeek();
+        saveData(true);
+    }
+}
+
+// --- RENDER WEEK ---
 function renderWeek() {
     const key = getWeekKey();
     const d = globalData[key] || {};
@@ -201,6 +242,7 @@ function renderWeek() {
     const todayIdx = new Date().getDay(); 
 
     const calContainer = document.getElementById('calendar-days');
+    if(!calContainer) return;
     
     calContainer.innerHTML = days.map((dayCode, i) => {
         const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
@@ -226,6 +268,7 @@ function renderWeek() {
             }
         }).join('');
 
+        // Righe vuote
         const emptySlots = Math.max(0, 5 - dayData.length);
         for(let e=0; e<emptySlots; e++) {
              rowsHtml += `
@@ -248,6 +291,7 @@ function renderWeek() {
         </div>`;
     }).join('');
 
+    // Dati Extra
     if(globalData.account) {
         if(document.getElementById('stat-sales')) document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
         if(document.getElementById('stat-units')) document.getElementById('stat-units').innerText = globalData.account.units || "0";
@@ -259,67 +303,46 @@ function renderWeek() {
     if(gcalData.length > 0) renderGoogleEvents();
 }
 
-function renderSidebar() {
-    const key = getWeekKey();
-    const d = globalData[key] || {};
-
-    const callList = document.getElementById('callList');
-    if(callList) {
-        let callHtml = '';
-        const savedCalls = d.calls || []; 
-        for(let i=0; i<8; i++) {
-            const val = savedCalls[i] || ''; 
-            // Qui andrebbe logica più complessa per salvare i singoli input della riga, 
-            // per semplicità assumiamo che il salvataggio sidebar sia gestito a parte o integrato.
-            // Per ora renderizziamo vuoto o base se non gestito diversamente.
-        }
-    }
-}
-
-// --- GESTIONE DATI ---
-window.addTaskManually = function(day, val) {
-    const key = getWeekKey();
-    if(!globalData[key]) globalData[key] = {};
-    if(!globalData[key][day]) globalData[key][day] = [];
+// --- GOOGLE FETCH ---
+async function fetchGoogle() {
+    let start = new Date(currentMon); 
+    let end = new Date(currentMon); end.setDate(end.getDate() + 5);
     
-    const txt = (typeof val === 'string') ? val : '';
-    const done = (typeof val !== 'string'); 
-    
-    globalData[key][day].push({ txt: txt, done: done });
-    
-    renderWeek();
-    saveData(true);
-}
+    try {
+        const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
+        const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
 
-function updateTask(day, row, val) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].txt = val;
-        deferredSave();
-    }
-}
-
-function toggleTask(day, row) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].done = !globalData[key][day][row].done;
-        renderWeek();
-        saveData(true); 
+        const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
+        
+        gcalData = [...ev1, ...ev2];
+        googleMixData = data;
+        
         if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+        renderGoogleEvents();
+
+    } catch(e) { console.error("Google Err:", e); }
+}
+
+function renderGoogleEvents() {
+    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
+    for(let i=1; i<=5; i++) { 
+        const el = document.getElementById(ids[i]);
+        if(el) { 
+            el.innerHTML = ''; 
+            gcalData.forEach(ev => { 
+                const d = new Date(ev.startTime); 
+                if(d.getDay() === i) { 
+                    const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); 
+                    let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`;
+                    el.insertAdjacentHTML('beforeend', html); 
+                } 
+            }); 
+        } 
     }
 }
 
-window.deleteTask = function(e, day, index) {
-    if(e) e.stopPropagation();
-    if(confirm("Eliminare questa riga?")) {
-        const key = getWeekKey();
-        globalData[key][day].splice(index, 1);
-        renderWeek();
-        saveData(true);
-    }
-}
-
-// --- DRAG & DROP ---
+// --- ALTRE FUNZIONI (Drag, Form, Etc) ---
 window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
 window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
 window.handleDrop = function(e, targetDay, targetIndex) {
@@ -334,7 +357,6 @@ window.handleDrop = function(e, targetDay, targetIndex) {
     return false;
 }
 
-// --- ALTRE FUNZIONI (MODALE, AZIENDE) ---
 window.openActivityModal = function() {
     document.getElementById('activityModal').style.display = 'flex';
     const select = document.getElementById('formCompany');
@@ -362,10 +384,19 @@ window.saveFromForm = function() {
     globalData[key][day] = dayData;
     renderWeek(); saveData(true); closeModal();
 }
+
 function renderCompanyButtons() {
     const cont = document.getElementById('companyTagsContainer');
-    if (!companyList.length) cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
-    else cont.innerHTML = companyList.map((c, i) => `<button class="btn-company" oncontextmenu="deleteCompany(event, ${i})"><div class="company-dot" style="background:${c.color}"></div>${c.name}</button>`).join('');
+    if (!companyList.length) {
+        cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
+    } else {
+        cont.innerHTML = companyList.map((c, i) => `
+            <button class="btn-company" oncontextmenu="deleteCompany(event, ${i})">
+                <div class="company-dot" style="background:${c.color}"></div>
+                ${c.name}
+            </button>
+        `).join('');
+    }
 }
 window.addNewCompany = function() {
     const name = document.getElementById('newCompName').value.trim().toUpperCase();
@@ -374,20 +405,21 @@ window.addNewCompany = function() {
 }
 window.deleteCompany = function(e, index) { e.preventDefault(); if(confirm(`Eliminare ${companyList[index].name}?`)) { companyList.splice(index, 1); renderCompanyButtons(); saveData(true); } }
 
-// --- HOME & GOOGLE ---
 function renderHomeWidgets() {
     const today = new Date().getDay(); 
     const daysMap = [null, 'mon', 'tue', 'wed', 'thu', 'fri'];
     const homeTasksEl = document.getElementById('home-tasks');
+    
     if (today >= 1 && today <= 5) {
         const dayCode = daysMap[today];
         const key = getWeekKey();
         const tasks = (globalData[key] && globalData[key][dayCode]) ? globalData[key][dayCode] : [];
         const activeTasks = tasks.filter(t => !t.isHeader && t.txt.trim() !== "");
+        
         if(activeTasks.length > 0) {
             homeTasksEl.innerHTML = activeTasks.map((t, i) => {
                 const realIdx = tasks.indexOf(t);
-                return `<div class="task-row" style="border-bottom:1px solid #f0f0f0;"><div class="task-chk ${t.done?'checked':''}" onclick="toggleTask('${dayCode}', ${realIdx})"></div><span style="font-size:13px; ${t.done?'text-decoration:line-through; color:#aaa':''}">${t.txt}</span></div>`;
+                return `<div class="task-row" style="border-bottom:1px solid #f0f0f0;"><div class="task-chk ${t.done?'checked':''}" onclick="toggleTask('${dayCode}', ${realIdx}); renderHomeWidgets();"></div><span style="font-size:13px; ${t.done?'text-decoration:line-through; color:#aaa':''}">${t.txt}</span></div>`;
             }).join('');
         } else { homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Nessuna attività oggi.</p>'; }
     } else { homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Buon Weekend!</p>'; }
@@ -407,39 +439,20 @@ function renderExternalData() {
     } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
     
     const mailEl = document.getElementById('mail-list-container');
-    if(googleMixData.email.length) { mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join(''); } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
+    if(googleMixData.email.length) {
+        mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join('');
+    } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
+    
     const docEl = document.getElementById('docs-list');
-    if(googleMixData.drive.length) { docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join(''); } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
-}
-
-async function fetchGoogle() {
-    if(GCAL_1.includes("LINK_SCRIPT")) return;
-    let start = new Date(currentMon); let end = new Date(currentMon); end.setDate(end.getDate() + 5);
-    try {
-        const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
-        const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
-        gcalData = [...ev1, ...ev2];
-        googleMixData = data;
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-        renderGoogleEvents();
-    } catch(e) { console.error("Google Err:", e); }
-}
-
-function renderGoogleEvents() {
-    const ids = [null, 'mon-gcal', 'tue-gcal', 'wed-gcal', 'thu-gcal', 'fri-gcal'];
-    for(let i=1; i<=5; i++) { const el = document.getElementById(ids[i]); if(el) { el.innerHTML = ''; gcalData.forEach(ev => { const d = new Date(ev.startTime); if(d.getDay() === i) { const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); let html = `<a href="${ev.link}" target="_blank" class="gcal-event"><span class="call-badge">CALL</span><span style="font-weight:700; margin-right:5px;">${time}</span>${ev.title}</a>`; el.insertAdjacentHTML('beforeend', html); } }); } }
+    if(googleMixData.drive.length) {
+        docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join('');
+    } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
 }
 
 function updateDateDisplay() {
-    const start = new Date(currentMon);
-    const end = new Date(currentMon); end.setDate(start.getDate() + 4);
-    const strDay = start.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
-    const strWeek = `${start.getDate()} - ${end.getDate()} ${end.toLocaleDateString('it-IT', { month: 'long' })}`;
-    document.getElementById('currentDayLabel').innerText = strDay.charAt(0).toUpperCase() + strDay.slice(1);
-    document.getElementById('currentWeekRange').innerText = strWeek;
-    document.getElementById('calDateDisplay').innerText = strWeek;
+    const str = currentMon.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+    document.getElementById('currentDate').innerText = str;
+    document.getElementById('calDateDisplay').innerText = str;
 }
 window.changeWeek = async function(dir) { await saveData(true); document.getElementById('loadingScreen').style.display='flex'; currentMon.setDate(currentMon.getDate() + (dir * 7)); updateDateDisplay(); loadData(false); }
 window.forceSync = function() { document.getElementById('loadingScreen').style.display='flex'; loadData(false); }
