@@ -1,16 +1,14 @@
-// --- CONFIGURAZIONE ---
+// --- CONFIGURAZIONE PANTRY (IL TUO SERVIZIO ATTUALE) ---
 const PWD = "giuseppe90";
 const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
 
-// LINK GOOGLE SCRIPT (Già inseriti quelli che mi hai dato)
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbxB9o4nTJpwgKKdYaCkHtjSTu7SeQsMvUPd-xiXbrXOBgXxkc_X9HjtrUdCxZ2Cs_FS/exec";
+// LINK GOOGLE SCRIPT
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
 const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
 
 // Rilevamento Test/Live
 const isLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "";
-
-// *** QUI RECUPERO I TUOI DATI: Uso il nome del database precedente ***
-const BASKET = isLocal ? "Dashboard_TEST_FINAL" : "Dashboard_FINAL"; 
+const BASKET = isLocal ? "Dashboard_TEST_FINAL_V2" : "Dashboard_FINAL_V2"; 
 const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET}`;
 
 const DEFAULT_COMPANIES = [];
@@ -51,7 +49,7 @@ function tryLogin() {
 function initApp() {
     document.getElementById('app').style.display='grid';
     document.getElementById('loadingScreen').style.display='flex';
-    document.getElementById('loadingText').innerText = "Recupero Dati...";
+    document.getElementById('loadingText').innerText = "Avvio...";
     
     if (isLocal) {
         const status = document.getElementById('syncStatus');
@@ -69,10 +67,23 @@ function initApp() {
     });
 
     updateDateDisplay();
+    
+    // 1. DISEGNA SUBITO LA GRIGLIA VUOTA (Così non vedi bianco)
+    renderWeek(); 
+    
+    // 2. Poi cerca i dati
     loadData(false);
     
     // Timeout sicurezza
-    setTimeout(() => { if (!isDataLoaded) { document.getElementById('loadingScreen').style.display = 'none'; isDataLoaded = true; setStatus('Recupero...', 'ok'); } }, 6000);
+    setTimeout(() => { 
+        if (!isDataLoaded) { 
+            document.getElementById('loadingScreen').style.display = 'none'; 
+            isDataLoaded = true; 
+            setStatus('Recupero...', 'ok');
+            renderWeek(); // Forza render finale
+        } 
+    }, 4000);
+    
     setInterval(() => loadData(true), 300000); 
 }
 
@@ -100,7 +111,7 @@ function setStatus(msg, type) {
     el.className = `status-badge status-${type}`;
 }
 
-// --- CARICAMENTO DATI ---
+// --- CARICAMENTO DATI (PANTRY) ---
 async function loadData(silent) {
     if(!silent) setStatus('Sync...', 'wait');
     try {
@@ -109,32 +120,32 @@ async function loadData(silent) {
             const json = await res.json();
             globalData = json || {};
             
-            // Recupera aziende
             companyList = globalData.COMPANIES || DEFAULT_COMPANIES;
             renderCompanyButtons();
             
             renderWeek();     
+            fetchGoogle();
             
-            // Sblocca UI prima di Google
             isDataLoaded = true;
             document.getElementById('loadingScreen').style.display='none';
             if(!silent) setStatus('Online', 'ok');
 
-            // Avvia Google in parallelo
-            fetchGoogle().then(() => {
-                if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-                renderGoogleEvents();
-            });
-
+            if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         } else {
+             // DB Nuovo
              isDataLoaded = true;
              document.getElementById('loadingScreen').style.display='none';
              renderWeek();
         }
-    } catch(e) { if(!silent) setStatus('Offline', 'wait'); isDataLoaded = true; document.getElementById('loadingScreen').style.display='none'; }
+    } catch(e) { 
+        if(!silent) setStatus('Offline', 'wait'); 
+        isDataLoaded = true; 
+        document.getElementById('loadingScreen').style.display='none'; 
+        renderWeek(); // Renderizza comunque, anche se offline
+    }
 }
 
-// --- RENDER COMPONENTI ---
+// --- RENDER CALENDARIO (FIX GRIGLIA) ---
 function renderWeek() {
     const key = getWeekKey();
     const d = globalData[key] || {};
@@ -144,6 +155,9 @@ function renderWeek() {
 
     const calContainer = document.getElementById('calendar-days');
     
+    // Se l'elemento non esiste ancora (es. caricamento lento HTML), esci
+    if(!calContainer) return;
+
     calContainer.innerHTML = days.map((dayCode, i) => {
         const dayData = Array.isArray(d[dayCode]) ? d[dayCode] : [];
         
@@ -168,6 +182,7 @@ function renderWeek() {
             }
         }).join('');
 
+        // Righe vuote
         const emptySlots = Math.max(0, 5 - dayData.length);
         for(let e=0; e<emptySlots; e++) {
              rowsHtml += `
@@ -190,6 +205,7 @@ function renderWeek() {
         </div>`;
     }).join('');
 
+    // Extra Data
     if(globalData.account) {
         if(document.getElementById('stat-sales')) document.getElementById('stat-sales').innerText = globalData.account.sales || "€ 0,00";
         if(document.getElementById('stat-units')) document.getElementById('stat-units').innerText = globalData.account.units || "0";
@@ -198,26 +214,115 @@ function renderWeek() {
     if(globalData.notes && document.getElementById('general-notes')) document.getElementById('general-notes').innerText = globalData.notes.general || "";
     if(globalData.home && document.getElementById('home-quick-notes')) document.getElementById('home-quick-notes').value = globalData.home.quick || "";
     
-    // Non chiamo renderGoogleEvents qui per evitare duplicati, lo chiamo dopo il fetch
+    if(gcalData.length > 0) renderGoogleEvents();
 }
 
-// --- FETCH GOOGLE (DUE SCRIPT) ---
+// --- FUNZIONI DATI ---
+window.deleteTask = function(e, day, index) {
+    if(e) e.stopPropagation();
+    if(confirm("Eliminare questa riga?")) {
+        const key = getWeekKey();
+        globalData[key][day].splice(index, 1);
+        renderWeek();
+        saveData(true);
+    }
+}
+
+window.addTaskManually = function(day, val) {
+    const key = getWeekKey();
+    if(!globalData[key]) globalData[key] = {};
+    if(!globalData[key][day]) globalData[key][day] = [];
+    
+    const txt = (typeof val === 'string') ? val : '';
+    const done = (typeof val !== 'string'); // Se non stringa, è click su check
+    
+    globalData[key][day].push({ txt: txt, done: done });
+    
+    renderWeek();
+    saveData(true);
+}
+
+function updateTask(day, row, val) {
+    const key = getWeekKey();
+    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+        globalData[key][day][row].txt = val;
+        deferredSave();
+    }
+}
+
+function toggleTask(day, row) {
+    const key = getWeekKey();
+    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
+        globalData[key][day][row].done = !globalData[key][day][row].done;
+        renderWeek();
+        saveData(true); // Salva subito
+        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
+    }
+}
+
+// --- SALVATAGGIO (PANTRY) ---
+function deferredSave() {
+    if(!isDataLoaded) return;
+    setStatus('Salvataggio...', 'wait');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveData(false), 2000);
+}
+
+window.manualSave = function() { saveData(true); }
+
+async function saveData(immediate) {
+    if(!isDataLoaded) return;
+    if(immediate) clearTimeout(saveTimer);
+    
+    setStatus('Salvataggio...', 'wait');
+    
+    const key = getWeekKey();
+    
+    // Recupero dati extra dal DOM
+    if(document.getElementById('stat-sales')) {
+        globalData.account = {
+            sales: document.getElementById('stat-sales').innerText,
+            units: document.getElementById('stat-units').innerText,
+            notes: document.getElementById('account-notes').innerText
+        };
+    }
+    if(document.getElementById('general-notes')) {
+        globalData.notes = { general: document.getElementById('general-notes').innerText };
+    }
+    if(document.getElementById('home-quick-notes')) {
+        globalData.home = { quick: document.getElementById('home-quick-notes').value };
+    }
+    globalData.COMPANIES = companyList;
+
+    try {
+        await fetch(PANTRY_URL, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify(globalData)
+        });
+        setStatus('Salvato', 'ok');
+    } catch(e) { 
+        setStatus('Errore Save', 'err'); 
+    }
+}
+
+// --- GOOGLE ---
 async function fetchGoogle() {
+    if(GCAL_1.includes("LINK_SCRIPT")) return;
+    
     let start = new Date(currentMon); 
     let end = new Date(currentMon); end.setDate(end.getDate() + 5);
     
     try {
         const p1 = fetch(`${GCAL_1}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
         const p2 = fetch(`${GCAL_2}?action=calendar&start=${start.toISOString()}&end=${end.toISOString()}`).then(r=>r.json()).catch(()=>[]);
-        
-        // Uso solo il primo script per Mail/Drive per non appesantire, o entrambi se necessario
         const pData = fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[], drive:[]}));
 
         const [ev1, ev2, data] = await Promise.all([p1, p2, pData]);
         
         gcalData = [...ev1, ...ev2];
         googleMixData = data;
-        
+
         if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
         renderGoogleEvents();
 
@@ -242,52 +347,31 @@ function renderGoogleEvents() {
     }
 }
 
-// --- GESTIONE DATI (MODIFICATA PER SALVATAGGIO IMMEDIATO) ---
-
-window.addTaskManually = function(day, val) {
-    const key = getWeekKey();
-    if(!globalData[key]) globalData[key] = {};
-    if(!globalData[key][day]) globalData[key][day] = [];
-    
-    const txt = (typeof val === 'string') ? val : '';
-    const done = (typeof val !== 'string'); 
-    
-    globalData[key][day].push({ txt: txt, done: done });
-    
-    renderWeek();
-    saveData(true); // Salva subito
-}
-
-function updateTask(day, row, val) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].txt = val;
-        deferredSave();
+// --- ALTRE FUNZIONI (Drag, Modali, ecc...) ---
+// (Sono uguali alla versione precedente, omesse per brevità ma devono esserci nel file completo)
+window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
+window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
+window.handleDrop = function(e, targetDay, targetIndex) {
+    e.stopPropagation(); e.preventDefault();
+    if (dragDay === targetDay && dragIndex !== targetIndex) {
+        const key = getWeekKey();
+        const list = globalData[key][targetDay];
+        const [movedItem] = list.splice(dragIndex, 1);
+        list.splice(targetIndex, 0, movedItem);
+        renderWeek(); saveData(true);
     }
+    return false;
 }
-
-function toggleTask(day, row) {
-    const key = getWeekKey();
-    if(globalData[key] && globalData[key][day] && globalData[key][day][row]) {
-        globalData[key][day][row].done = !globalData[key][day][row].done;
-        renderWeek();
-        saveData(true); // Salva subito
-        if(document.getElementById('page-home').classList.contains('active')) renderHomeWidgets();
-    }
-}
-
-// --- MODALE ---
 window.openActivityModal = function() {
     document.getElementById('activityModal').style.display = 'flex';
     const select = document.getElementById('formCompany');
-    if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda (tasto +)</option>';
+    if(companyList.length === 0) select.innerHTML = '<option disabled selected>Crea prima un\'azienda</option>';
     else select.innerHTML = companyList.map((c, i) => `<option value="${i}">${c.name}</option>`).join('');
     const today = new Date().getDay();
     const daysMap = ['mon','mon','tue','wed','thu','fri','mon'];
     document.getElementById('formDay').value = daysMap[today];
 }
 window.closeModal = function() { document.getElementById('activityModal').style.display = 'none'; document.getElementById('formTasks').value = ''; }
-
 window.saveFromForm = function() {
     const day = document.getElementById('formDay').value;
     const compIdx = document.getElementById('formCompany').value;
@@ -305,44 +389,10 @@ window.saveFromForm = function() {
     globalData[key][day] = dayData;
     renderWeek(); saveData(true); closeModal();
 }
-
-window.deleteTask = function(e, day, index) {
-    if(e) e.stopPropagation();
-    if(confirm("Eliminare questa riga?")) {
-        const key = getWeekKey();
-        globalData[key][day].splice(index, 1);
-        renderWeek();
-        saveData(true);
-    }
-}
-
-window.handleDragStart = function(e, day, index) { dragSrcEl=e.target; dragDay=day; dragIndex=index; e.target.style.opacity='0.5'; e.dataTransfer.effectAllowed='move'; }
-window.handleDragOver = function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; }
-window.handleDrop = function(e, targetDay, targetIndex) {
-    e.stopPropagation(); e.preventDefault();
-    if (dragDay === targetDay && dragIndex !== targetIndex) {
-        const key = getWeekKey();
-        const list = globalData[key][targetDay];
-        const [movedItem] = list.splice(dragIndex, 1);
-        list.splice(targetIndex, 0, movedItem);
-        renderWeek(); saveData(true);
-    }
-    return false;
-}
-
-// --- AZIENDE ---
 function renderCompanyButtons() {
     const cont = document.getElementById('companyTagsContainer');
-    if (!companyList.length) {
-        cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
-    } else {
-        cont.innerHTML = companyList.map((c, i) => `
-            <button class="btn-company" oncontextmenu="deleteCompany(event, ${i})">
-                <div class="company-dot" style="background:${c.color}"></div>
-                ${c.name}
-            </button>
-        `).join('');
-    }
+    if (!companyList.length) cont.innerHTML = "<span style='font-size:10px; color:#aaa; margin-left:10px;'>Crea un'azienda</span>";
+    else cont.innerHTML = companyList.map((c, i) => `<button class="btn-company" oncontextmenu="deleteCompany(event, ${i})"><div class="company-dot" style="background:${c.color}"></div>${c.name}</button>`).join('');
 }
 window.addNewCompany = function() {
     const name = document.getElementById('newCompName').value.trim().toUpperCase();
@@ -350,29 +400,24 @@ window.addNewCompany = function() {
     if(name) { companyList.push({name, color}); document.getElementById('newCompName').value = ""; saveData(true); renderCompanyButtons(); }
 }
 window.deleteCompany = function(e, index) { e.preventDefault(); if(confirm(`Eliminare ${companyList[index].name}?`)) { companyList.splice(index, 1); renderCompanyButtons(); saveData(true); } }
-
-// --- HOME ---
 function renderHomeWidgets() {
     const today = new Date().getDay(); 
     const daysMap = [null, 'mon', 'tue', 'wed', 'thu', 'fri'];
     const homeTasksEl = document.getElementById('home-tasks');
-    
     if (today >= 1 && today <= 5) {
         const dayCode = daysMap[today];
         const key = getWeekKey();
         const tasks = (globalData[key] && globalData[key][dayCode]) ? globalData[key][dayCode] : [];
         const activeTasks = tasks.filter(t => !t.isHeader && t.txt.trim() !== "");
-        
         if(activeTasks.length > 0) {
             homeTasksEl.innerHTML = activeTasks.map((t, i) => {
                 const realIdx = tasks.indexOf(t);
-                return `<div class="task-row" style="border-bottom:1px solid #f0f0f0;"><div class="task-chk ${t.done?'checked':''}" onclick="toggleTask('${dayCode}', ${realIdx});"></div><span style="font-size:13px; ${t.done?'text-decoration:line-through; color:#aaa':''}">${t.txt}</span></div>`;
+                return `<div class="task-row" style="border-bottom:1px solid #f0f0f0;"><div class="task-chk ${t.done?'checked':''}" onclick="toggleTask('${dayCode}', ${realIdx}); renderHomeWidgets();"></div><span style="font-size:13px; ${t.done?'text-decoration:line-through; color:#aaa':''}">${t.txt}</span></div>`;
             }).join('');
         } else { homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Nessuna attività oggi.</p>'; }
     } else { homeTasksEl.innerHTML = '<p style="color:var(--text-sub); text-align:center; padding-top:20px">Buon Weekend!</p>'; }
     renderExternalData();
 }
-
 function renderExternalData() {
     const homeCallsEl = document.getElementById('home-calls');
     homeCallsEl.innerHTML = '';
@@ -384,60 +429,11 @@ function renderExternalData() {
             homeCallsEl.innerHTML += html;
         });
     } else { homeCallsEl.innerHTML = '<p style="color:var(--text-sub); text-align:center;">Nessuna call.</p>'; }
-    
     const mailEl = document.getElementById('mail-list-container');
-    if(googleMixData.email.length) {
-        mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join('');
-    } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
-    
+    if(googleMixData.email.length) { mailEl.innerHTML = googleMixData.email.map(m => `<div class="mail-item" onclick="window.open('${m.link}', '_blank')"><span class="mail-from">${m.from}</span><span class="mail-subj">${m.subject}</span></div>`).join(''); } else { mailEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
     const docEl = document.getElementById('docs-list');
-    if(googleMixData.drive.length) {
-        docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join('');
-    } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
+    if(googleMixData.drive.length) { docEl.innerHTML = googleMixData.drive.map(d => `<a href="${d.url}" target="_blank" class="doc-link"><span class="material-icons-round" style="font-size:18px; color:#5E6C84">${d.icon}</span><span class="doc-name" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</span></a>`).join(''); } else { docEl.innerHTML = '<p style="color:var(--text-sub); font-size:12px; text-align:center;">Vuoto</p>'; }
 }
-
-// --- SAVING ---
-function deferredSave() {
-    if(!isDataLoaded) return;
-    setStatus('Salvataggio...', 'wait');
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveData(false), 2000);
-}
-
-window.manualSave = function() { saveData(true); }
-
-async function saveData(immediate) {
-    if(!isDataLoaded) return;
-    if(immediate) clearTimeout(saveTimer);
-    
-    setStatus('Salvataggio...', 'wait');
-    
-    const key = getWeekKey();
-    if(document.getElementById('stat-sales')) {
-        globalData.account = {
-            sales: document.getElementById('stat-sales').innerText,
-            units: document.getElementById('stat-units').innerText,
-            notes: document.getElementById('account-notes').innerText
-        };
-    }
-    if(document.getElementById('general-notes')) {
-        globalData.notes = { general: document.getElementById('general-notes').innerText };
-    }
-    if(document.getElementById('home-quick-notes')) {
-        globalData.home = { quick: document.getElementById('home-quick-notes').value };
-    }
-    globalData.COMPANIES = companyList;
-
-    try {
-        await fetch(PANTRY_URL, {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(globalData)
-        });
-        setStatus('Salvato', 'ok');
-    } catch(e) { setStatus('Errore Save', 'err'); }
-}
-
-// --- UTILS ---
 function updateDateDisplay() {
     const start = new Date(currentMon);
     const end = new Date(currentMon); end.setDate(start.getDate() + 4);
