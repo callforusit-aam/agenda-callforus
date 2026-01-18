@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CallForUs | Manager</title>
-    <link rel="stylesheet" href="style.css?v=42"> 
+    <link rel="stylesheet" href="style.css?v=48"> 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
@@ -27,7 +27,7 @@
         <p style="margin-top:20px; font-weight:600; color:#333" id="loadingText">Avvio sistema...</p>
     </div>
 
-    <!-- MODALE AGGIUNTA -->
+    <!-- MODALE STANDARD (Aggiunta diretta al calendario) -->
     <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:1500;">
         <div class="modal-box">
             <div class="modal-header">
@@ -47,13 +47,34 @@
             <div class="form-group">
                 <label>Azienda</label>
                 <select id="formCompany" class="modal-select"></select>
-                <p style="font-size:11px; color:var(--text-sub); margin-top:5px;">(Gestisci aziende dalla toolbar)</p>
             </div>
             <div class="form-group">
                 <label>Attività</label>
                 <textarea id="formTasks" class="modal-textarea" rows="6" placeholder="- Task 1&#10;- Task 2"></textarea>
             </div>
             <button class="btn-primary" onclick="saveFromForm()" style="width:100%; justify-content:center; margin-top:10px;">INSERISCI</button>
+        </div>
+    </div>
+
+    <!-- MODALE PIANIFICAZIONE (Nuovo: Da Backlog a Calendario) -->
+    <div id="scheduleModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:1600;">
+        <div class="modal-box" style="width: 320px;">
+            <div class="modal-header">
+                <h3>Pianifica Attività</h3>
+                <span class="material-icons-round close-btn" onclick="closeScheduleModal()">close</span>
+            </div>
+            <p style="font-size:13px; color:var(--text-sub); margin-bottom:15px;">Scegli il giorno in cui spostare questa attività:</p>
+            
+            <div class="form-group">
+                <select id="scheduleDay" class="modal-select">
+                    <option value="mon">Lunedì</option>
+                    <option value="tue">Martedì</option>
+                    <option value="wed">Mercoledì</option>
+                    <option value="thu">Giovedì</option>
+                    <option value="fri">Venerdì</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="confirmSchedule()" style="width:100%; justify-content:center;">FISSA NEL CALENDARIO</button>
         </div>
     </div>
 
@@ -65,7 +86,8 @@
                 <button class="menu-item active" onclick="nav('home')" title="Home"><span class="material-icons-round">dashboard</span></button>
                 <button class="menu-item" onclick="nav('calendar')" title="Calendario"><span class="material-icons-round">calendar_today</span></button>
                 <button class="menu-item" onclick="nav('account')" title="Account"><span class="material-icons-round">bar_chart</span></button>
-                <button class="menu-item" onclick="nav('notes')" title="Note"><span class="material-icons-round">folder_open</span></button>
+                <!-- Icona cambiata per indicare pianificazione -->
+                <button class="menu-item" onclick="nav('notes')" title="Da Pianificare"><span class="material-icons-round">rule</span></button>
             </div>
             <div style="margin-top:auto">
                 <button class="menu-item" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
@@ -160,11 +182,34 @@
                 </div>
             </div>
 
-            <!-- NOTE -->
+            <!-- 4. DA PIANIFICARE (BACKLOG) - SEZIONE SOSTITUITA -->
             <div id="page-notes" class="page">
-                <div class="card" style="height:100%">
-                    <div class="card-header"><h3>Blocco Note Generale</h3></div>
-                    <div id="general-notes" contenteditable="true" style="height:100%; outline:none; font-size:14px; line-height:1.6;" oninput="saveData()"></div>
+                <div class="backlog-layout">
+                    
+                    <!-- FORM AGGIUNTA -->
+                    <div class="card backlog-form-card">
+                        <div class="card-header"><h3>Aggiungi Attività</h3></div>
+                        
+                        <label class="form-label">Nome Azienda</label>
+                        <input type="text" id="blCompany" class="sb-input" placeholder="Es. GEARXPRO">
+                        
+                        <label class="form-label">Descrizione Attività</label>
+                        <textarea id="blText" class="modal-textarea" style="height:100px; resize:none;" placeholder="Descrivi cosa fare..."></textarea>
+                        
+                        <button class="btn-primary" onclick="addToBacklog()" style="margin-top:15px; justify-content:center;">AGGIUNGI ALLA LISTA</button>
+                    </div>
+
+                    <!-- LISTA ATTIVITÀ -->
+                    <div class="card backlog-list-card">
+                        <div class="card-header">
+                            <h3>Da Pianificare</h3>
+                            <span class="status-badge status-wait" id="backlogCount">0</span>
+                        </div>
+                        <div class="card-body scrollable" id="backlogListContainer">
+                            <!-- Qui appariranno i ticket -->
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
