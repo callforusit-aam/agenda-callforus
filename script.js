@@ -1,7 +1,7 @@
 // --- CONFIGURAZIONE ---
 const PWD = "giuseppe90";
 const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
-const GCAL_1 = "https://script.google.com/macros/s/AKfycbw7l-WUQr3cW1BxuEbIMmmGG_MdCfJxW1_O2S-E740/exec";
+const GCAL_1 = "https://script.google.com/macros/s/AKfycbxKEBpzjP6zbrato19rFr1YrTU6hKEy9iy712jVmpVa5Lfw2FKtgCX7Lmv_FHnStvwr/exec";
 const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
 
 // Rilevamento Test/Live
