@@ -4,217 +4,362 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CallForUs | Manager</title>
-    <link rel="stylesheet" href="style.css?v=48"> 
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
 <body data-theme="light">
 
-    <!-- LOGIN -->
-    <div id="loginScreen" class="overlay">
-        <div class="login-box">
-            <img src="logo.png" alt="Logo" style="height:60px; margin-bottom:20px;" onerror="this.style.display='none'">
-            <h2 style="margin-bottom:20px;">Accesso</h2>
-            <input type="password" id="passwordInput" class="login-input" placeholder="Password">
-            <button class="btn-primary" onclick="tryLogin()" style="width:100%; justify-content:center;">ENTRA</button>
-            <p id="loginError" style="color:red; display:none; margin-top:10px;">Errata</p>
+<div id="toast" class="toast">OK</div>
+
+<!-- ══ LOGIN ════════════════════════════════════════════════ -->
+<div id="loginScreen" class="overlay">
+    <div class="login-box">
+        <img src="logo.png" alt="" style="height:48px;margin-bottom:20px;" onerror="this.style.display='none'">
+        <div class="login-title">CallForUs</div>
+        <div class="login-sub">Manager Dashboard</div>
+        <input type="password" id="passwordInput" class="login-inp" placeholder="Password"
+            onkeydown="if(event.key==='Enter')tryLogin()">
+        <button class="btn btn-primary" onclick="tryLogin()" style="width:100%;justify-content:center;">Accedi</button>
+        <p id="loginError" style="color:var(--c-red);font-size:12px;margin-top:10px;display:none;">Password errata</p>
+    </div>
+</div>
+
+<!-- ══ LOADING ═══════════════════════════════════════════════ -->
+<div id="loadingScreen" class="overlay" style="display:none;">
+    <div class="loader"></div>
+    <p style="margin-top:14px;font-size:12px;color:var(--c-text-2);" id="loadingText">Caricamento...</p>
+</div>
+
+<!-- ══ MODAL: Nuovo Gruppo ════════════════════════════════════ -->
+<div id="groupModal" class="modal-bg">
+    <div class="modal">
+        <div class="modal-head">
+            <span class="modal-title">Nuovo Gruppo</span>
+            <button class="modal-close" onclick="closeModal('groupModal')"><span class="material-icons-round">close</span></button>
+        </div>
+        <label class="form-label">Giorno</label>
+        <select id="formDay" class="modal-select">
+            <option value="mon">Lunedì</option><option value="tue">Martedì</option>
+            <option value="wed">Mercoledì</option><option value="thu">Giovedì</option><option value="fri">Venerdì</option>
+        </select>
+        <label class="form-label">Azienda</label>
+        <select id="formCompany" class="modal-select"></select>
+        <label class="form-label">Task (uno per riga)</label>
+        <textarea id="formTasks" class="modal-ta" placeholder="- Task 1&#10;- Task 2&#10;- Task 3"></textarea>
+        <button class="btn btn-primary" onclick="saveFromForm()" style="width:100%;justify-content:center;margin-top:6px;">
+            Inserisci nel calendario
+        </button>
+    </div>
+</div>
+
+<!-- ══ MODAL: Pianifica backlog ══════════════════════════════ -->
+<div id="scheduleModal" class="modal-bg">
+    <div class="modal" style="max-width:320px;">
+        <div class="modal-head">
+            <span class="modal-title">Pianifica attività</span>
+            <button class="modal-close" onclick="closeModal('scheduleModal')"><span class="material-icons-round">close</span></button>
+        </div>
+        <p style="font-size:12px;color:var(--c-text-2);margin-bottom:14px;">Scegli il giorno in cui spostare questa attività:</p>
+        <label class="form-label">Giorno</label>
+        <select id="scheduleDay" class="modal-select">
+            <option value="mon">Lunedì</option><option value="tue">Martedì</option>
+            <option value="wed">Mercoledì</option><option value="thu">Giovedì</option><option value="fri">Venerdì</option>
+        </select>
+        <button class="btn btn-primary" onclick="confirmSchedule()" style="width:100%;justify-content:center;">
+            <span class="material-icons-round">event_available</span> Fissa nel calendario
+        </button>
+    </div>
+</div>
+
+<!-- ══ MODAL: Export ═════════════════════════════════════════ -->
+<div id="exportModal" class="modal-bg">
+    <div class="modal export-modal">
+        <div class="modal-head">
+            <span class="modal-title">Esporta settimana</span>
+            <button class="modal-close" onclick="closeModal('exportModal')"><span class="material-icons-round">close</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-primary" onclick="exportCSV();closeModal('exportModal');" style="justify-content:center;">
+                <span class="material-icons-round">table_chart</span> Esporta CSV
+            </button>
+            <button class="btn btn-ghost" onclick="exportPrint();closeModal('exportModal');" style="justify-content:center;">
+                <span class="material-icons-round">print</span> Stampa / PDF
+            </button>
         </div>
     </div>
+</div>
 
-    <!-- LOADING -->
-    <div id="loadingScreen" class="overlay" style="display:none; background:rgba(255,255,255,0.95); z-index: 2000;">
-        <div class="loader"></div>
-        <p style="margin-top:20px; font-weight:600; color:#333" id="loadingText">Avvio sistema...</p>
-    </div>
-
-    <!-- MODALE STANDARD (Aggiunta diretta al calendario) -->
-    <div id="activityModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:1500;">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Nuovo Gruppo</h3>
-                <span class="material-icons-round close-btn" onclick="closeModal()">close</span>
-            </div>
-            <div class="form-group">
-                <label>Giorno</label>
-                <select id="formDay" class="modal-select">
-                    <option value="mon">Lunedì</option>
-                    <option value="tue">Martedì</option>
-                    <option value="wed">Mercoledì</option>
-                    <option value="thu">Giovedì</option>
-                    <option value="fri">Venerdì</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Azienda</label>
-                <select id="formCompany" class="modal-select"></select>
-            </div>
-            <div class="form-group">
-                <label>Attività</label>
-                <textarea id="formTasks" class="modal-textarea" rows="6" placeholder="- Task 1&#10;- Task 2"></textarea>
-            </div>
-            <button class="btn-primary" onclick="saveFromForm()" style="width:100%; justify-content:center; margin-top:10px;">INSERISCI</button>
+<!-- ══ VOICE MODAL ══════════════════════════════════════════ -->
+<div id="voiceModal" class="modal-bg">
+    <div class="modal" style="max-width:480px;text-align:center;">
+        <div class="modal-head" style="justify-content:center;border-bottom:1px solid var(--c-border);padding-bottom:14px;margin-bottom:18px;">
+            <span class="modal-title">Aggiungi task con la voce</span>
         </div>
-    </div>
 
-    <!-- MODALE PIANIFICAZIONE (Nuovo: Da Backlog a Calendario) -->
-    <div id="scheduleModal" class="overlay" style="display:none; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:1600;">
-        <div class="modal-box" style="width: 320px;">
-            <div class="modal-header">
-                <h3>Pianifica Attività</h3>
-                <span class="material-icons-round close-btn" onclick="closeScheduleModal()">close</span>
+        <!-- Recording state -->
+        <div id="voiceRecording" style="display:none;">
+            <div id="voicePulse" style="width:72px;height:72px;border-radius:50%;background:var(--c-red);display:grid;place-items:center;margin:0 auto 16px;animation:voicePulse 1s ease infinite;">
+                <span class="material-icons-round" style="font-size:32px;color:#fff;">mic</span>
             </div>
-            <p style="font-size:13px; color:var(--text-sub); margin-bottom:15px;">Scegli il giorno in cui spostare questa attività:</p>
-            
-            <div class="form-group">
-                <select id="scheduleDay" class="modal-select">
-                    <option value="mon">Lunedì</option>
-                    <option value="tue">Martedì</option>
-                    <option value="wed">Mercoledì</option>
-                    <option value="thu">Giovedì</option>
-                    <option value="fri">Venerdì</option>
-                </select>
-            </div>
-            <button class="btn-primary" onclick="confirmSchedule()" style="width:100%; justify-content:center;">FISSA NEL CALENDARIO</button>
+            <p style="font-size:13px;font-weight:600;color:var(--c-text);">Sto ascoltando...</p>
+            <p style="font-size:12px;color:var(--c-text-2);margin-top:4px;">Parla liberamente, es: "Per GearXPro controlla il PPC e per Calugi il report ADV"</p>
+            <button class="btn btn-ghost" onclick="stopVoice()" style="margin-top:18px;width:100%;justify-content:center;">
+                <span class="material-icons-round">stop</span> Ferma registrazione
+            </button>
         </div>
-    </div>
 
-    <div id="app" style="display:none;">
-        
-        <nav class="sidebar">
-            <div class="logo-icon">H</div>
-            <div class="menu">
-                <button class="menu-item active" onclick="nav('home')" title="Home"><span class="material-icons-round">dashboard</span></button>
-                <button class="menu-item" onclick="nav('calendar')" title="Calendario"><span class="material-icons-round">calendar_today</span></button>
-                <button class="menu-item" onclick="nav('account')" title="Account"><span class="material-icons-round">bar_chart</span></button>
-                <!-- Icona cambiata per indicare pianificazione -->
-                <button class="menu-item" onclick="nav('notes')" title="Da Pianificare"><span class="material-icons-round">rule</span></button>
-            </div>
-            <div style="margin-top:auto">
-                <button class="menu-item" onclick="toggleTheme()" title="Tema"><span class="material-icons-round">dark_mode</span></button>
-            </div>
-        </nav>
+        <!-- Transcript + processing -->
+        <div id="voiceProcessing" style="display:none;">
+            <div class="loader" style="margin:0 auto 16px;"></div>
+            <p style="font-size:13px;font-weight:600;color:var(--c-text);">Claude sta elaborando...</p>
+            <div id="voiceTranscript" style="margin-top:12px;padding:12px;background:var(--c-bg);border-radius:var(--radius-sm);font-size:12px;color:var(--c-text-2);text-align:left;line-height:1.5;border:1px solid var(--c-border);"></div>
+        </div>
 
-        <main>
-            <header>
-                <div class="header-title">
-                    <h2 id="pageTitle">Dashboard</h2>
-                    <div class="date-info">
-                        <span id="currentDayLabel" class="today-label">...</span>
-                        <span id="currentWeekRange" class="week-label">...</span>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <div id="syncStatus" class="status-badge status-ok">Sync...</div>
-                    <button class="icon-btn" onclick="manualSave()" title="Salva"><span class="material-icons-round">save</span></button>
-                    <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
-                    <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn-primary">
-                        <span class="material-icons-round">add_circle</span> Organizza Call
-                    </a>
-                </div>
-            </header>
-
-            <!-- TOOLBAR -->
-            <div class="toolbar" id="mainToolbar" style="display:none;">
-                <button class="btn-primary" onclick="openActivityModal()" style="margin-right:20px; background:var(--text-main); color:var(--bg-card); border:1px solid var(--border);">
-                    <span class="material-icons-round">playlist_add</span> Gruppo
+        <!-- Result preview -->
+        <div id="voiceResult" style="display:none;">
+            <span class="material-icons-round" style="font-size:40px;color:var(--c-green);margin-bottom:10px;display:block;">check_circle</span>
+            <p style="font-size:14px;font-weight:700;margin-bottom:14px;">Ecco i task riconosciuti:</p>
+            <div id="voicePreview" style="text-align:left;margin-bottom:18px;max-height:260px;overflow-y:auto;"></div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost" onclick="resetVoice()" style="flex:1;justify-content:center;">Riprova</button>
+                <button class="btn btn-primary" onclick="confirmVoiceTasks()" style="flex:1;justify-content:center;">
+                    <span class="material-icons-round">add_task</span> Inserisci nel calendario
                 </button>
-
-                <div class="company-creator">
-                    <input type="color" id="newCompColor" value="#000000" title="Colore Azienda">
-                    <input type="text" id="newCompName" placeholder="NUOVA AZIENDA">
-                    <button class="btn-icon-small" onclick="addNewCompany()"><span class="material-icons-round">add</span></button>
-                </div>
-                <div id="companyTagsContainer" style="display:none;"></div> 
             </div>
+        </div>
 
-            <!-- HOME -->
-            <div id="page-home" class="page active">
-                <div class="dashboard-grid">
-                    <div class="card focus-card">
-                        <div class="card-header">
-                            <h3>Attività di Oggi</h3>
-                            <button class="icon-btn" onclick="nav('calendar')" style="width:30px; height:30px;"><span class="material-icons-round" style="font-size:16px">edit</span></button>
-                        </div>
-                        <div class="card-body" id="home-tasks" style="padding-right:5px; overflow-y:auto;"></div>
-                    </div>
-                    <div class="card call-card">
-                        <div class="card-header">
-                            <h3>Prossima Call</h3>
-                            <span class="status-badge status-wait">G-Meet</span>
-                        </div>
-                        <div class="card-body" id="home-calls"></div>
-                    </div>
-                    <div class="card mail-card">
-                        <div class="card-header"><h3>Posta</h3></div>
-                        <div class="card-body scrollable" id="mail-list-container"></div>
-                        <a href="https://mail.google.com" target="_blank" class="btn-secondary" style="margin-top:10px;">Apri Gmail</a>
-                    </div>
-                    <div class="card docs-card">
-                        <div class="card-header"><h3>Docs</h3></div>
-                        <div class="card-body scrollable" id="docs-list"></div>
-                        <a href="https://drive.google.com" target="_blank" class="btn-secondary" style="margin-top:10px;">Apri Drive</a>
-                    </div>
-                    <div class="card input-card">
-                        <div class="card-header"><h3>Note Veloci</h3></div>
-                        <textarea id="home-quick-notes" placeholder="Scrivi appunti..." oninput="saveData()"></textarea>
-                    </div>
-                </div>
+        <!-- Error state -->
+        <div id="voiceError" style="display:none;">
+            <span class="material-icons-round" style="font-size:40px;color:var(--c-red);margin-bottom:10px;display:block;">error_outline</span>
+            <p id="voiceErrorMsg" style="font-size:13px;color:var(--c-text-2);margin-bottom:16px;"></p>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost" onclick="closeModal('voiceModal')" style="flex:1;justify-content:center;">Chiudi</button>
+                <button class="btn btn-primary" onclick="resetVoice()" style="flex:1;justify-content:center;">Riprova</button>
             </div>
+        </div>
 
-            <!-- CALENDARIO -->
-            <div id="page-calendar" class="page">
-                <div class="calendar-layout-wide">
-                    <div class="cal-days-grid" id="calendar-days"></div>
-                    <div class="cal-nav-bottom">
-                        <button class="icon-btn" onclick="changeWeek(-1)"><span class="material-icons-round">chevron_left</span></button>
-                        <span id="calDateDisplay" style="font-weight:600; font-size:14px; min-width:150px; text-align:center;">...</span>
-                        <button class="icon-btn" onclick="changeWeek(1)"><span class="material-icons-round">chevron_right</span></button>
-                    </div>
-                </div>
+        <!-- Idle state (initial) -->
+        <div id="voiceIdle">
+            <div style="width:72px;height:72px;border-radius:50%;background:var(--c-accent-bg);display:grid;place-items:center;margin:0 auto 16px;">
+                <span class="material-icons-round" style="font-size:32px;color:var(--c-accent);">mic</span>
             </div>
-
-            <!-- ACCOUNT -->
-            <div id="page-account" class="page">
-                <div class="account-grid">
-                    <div class="card" style="text-align:center;"><h3>Vendite Oggi</h3><div class="big-num" contenteditable="true" id="stat-sales" oninput="saveData()">€ 0,00</div></div>
-                    <div class="card" style="text-align:center;"><h3>Unità Vendute</h3><div class="big-num" contenteditable="true" id="stat-units" oninput="saveData()">0</div></div>
-                    <div class="card" style="grid-column:1/-1; min-height:400px;"><div class="card-header"><h3>Note Performance</h3></div><div id="account-notes" contenteditable="true" style="height:100%; outline:none;" oninput="saveData()"></div></div>
-                </div>
-            </div>
-
-            <!-- 4. DA PIANIFICARE (BACKLOG) - SEZIONE SOSTITUITA -->
-            <div id="page-notes" class="page">
-                <div class="backlog-layout">
-                    
-                    <!-- FORM AGGIUNTA -->
-                    <div class="card backlog-form-card">
-                        <div class="card-header"><h3>Aggiungi Attività</h3></div>
-                        
-                        <label class="form-label">Nome Azienda</label>
-                        <input type="text" id="blCompany" class="sb-input" placeholder="Es. GEARXPRO">
-                        
-                        <label class="form-label">Descrizione Attività</label>
-                        <textarea id="blText" class="modal-textarea" style="height:100px; resize:none;" placeholder="Descrivi cosa fare..."></textarea>
-                        
-                        <button class="btn-primary" onclick="addToBacklog()" style="margin-top:15px; justify-content:center;">AGGIUNGI ALLA LISTA</button>
-                    </div>
-
-                    <!-- LISTA ATTIVITÀ -->
-                    <div class="card backlog-list-card">
-                        <div class="card-header">
-                            <h3>Da Pianificare</h3>
-                            <span class="status-badge status-wait" id="backlogCount">0</span>
-                        </div>
-                        <div class="card-body scrollable" id="backlogListContainer">
-                            <!-- Qui appariranno i ticket -->
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        </main>
+            <p style="font-size:13px;color:var(--c-text-2);margin-bottom:6px;">Premi il bottone e parla.</p>
+            <p style="font-size:12px;color:var(--c-text-3);margin-bottom:20px;line-height:1.5;">Claude riconoscerà le aziende e creerà i task automaticamente nel giorno di oggi.</p>
+            <button class="btn btn-primary" onclick="startVoice()" style="width:100%;justify-content:center;height:46px;font-size:14px;">
+                <span class="material-icons-round">mic</span> Inizia registrazione
+            </button>
+            <button class="btn btn-ghost" onclick="closeModal('voiceModal')" style="width:100%;justify-content:center;margin-top:8px;">Annulla</button>
+        </div>
     </div>
-    <script src="script.js"></script>
+</div>
+
+<!-- ══ APP SHELL ══════════════════════════════════════════════ -->
+<div id="app-shell" style="display:none;">
+
+    <!-- Sidebar (desktop) -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">H</div>
+        <div class="sidebar-nav">
+            <button class="sb-btn active" id="sb-home" onclick="nav('home',this)" data-tip="Dashboard">
+                <span class="material-icons-round">dashboard</span>
+            </button>
+            <button class="sb-btn" id="sb-calendar" onclick="nav('calendar',this)" data-tip="Calendario">
+                <span class="material-icons-round">calendar_today</span>
+            </button>
+            <button class="sb-btn" id="sb-backlog" onclick="nav('backlog',this)" data-tip="Da Pianificare">
+                <span class="material-icons-round">rule</span>
+            </button>
+            <button class="sb-btn" id="sb-notes" onclick="nav('notes',this)" data-tip="Note">
+                <span class="material-icons-round">edit_note</span>
+            </button>
+        </div>
+        <div class="sidebar-bottom">
+            <button class="sb-btn" onclick="toggleTheme()" data-tip="Tema">
+                <span class="material-icons-round">dark_mode</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-title">
+            <h2 id="pageTitle">Dashboard</h2>
+            <div class="header-sub">
+                <b id="currentDayLabel">...</b>
+                <span id="currentWeekRange">...</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="status-indicator">
+                <span class="status-dot ok" id="statusDot"></span>
+                <span id="statusText">Online</span>
+            </div>
+            <!-- next call chip -->
+            <div id="nextCallChip" style="display:none;align-items:center;gap:6px;background:var(--c-yellow-bg);border:1px solid #FDE68A;border-radius:20px;padding:4px 12px;cursor:pointer;" title="Prossima call"></div>
+            <button class="icon-btn" onclick="manualSave()" title="Salva (S)"><span class="material-icons-round">save</span></button>
+            <button class="icon-btn" onclick="forceSync()" title="Ricarica"><span class="material-icons-round">refresh</span></button>
+            <button class="icon-btn" onclick="openExport()" title="Esporta (E)"><span class="material-icons-round">download</span></button>
+            <button class="icon-btn" id="voiceBtn" onclick="toggleVoice()" title="Aggiungi task con la voce" style="position:relative;">
+                <span class="material-icons-round">mic</span>
+            </button>
+            <a href="https://calendar.google.com/calendar/u/0/r/eventedit?v=2" target="_blank" class="btn btn-primary">
+                <span class="material-icons-round">add</span> Organizza Call
+            </a>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <div class="main-content" style="grid-column:2;grid-row:2/3;display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Toolbar (calendar) -->
+        <div class="toolbar" id="toolbar">
+            <button class="btn btn-ghost" onclick="openModal('groupModal')" id="groupBtn" style="display:none;">
+                <span class="material-icons-round">playlist_add</span> Gruppo
+            </button>
+            <div class="toolbar-sep" id="toolbarSep" style="display:none;"></div>
+            <input type="color" id="newCompColor" value="#2563EB" title="Colore">
+            <input type="text" id="newCompName" class="co-inp" placeholder="NUOVA AZIENDA" maxlength="20"
+                onkeydown="if(event.key==='Enter')addNewCompany()">
+            <button class="co-add" onclick="addNewCompany()" title="Aggiungi"><span class="material-icons-round">add</span></button>
+            <div class="toolbar-sep"></div>
+            <div id="companyTagsContainer" style="display:contents;"></div>
+            <!-- filter badge -->
+            <div id="filterBadge" style="display:none;margin-left:auto;display:none;align-items:center;gap:6px;background:var(--c-accent-bg);padding:4px 10px;border-radius:20px;border:1px solid var(--c-accent);">
+                <span style="font-size:11px;font-weight:600;color:var(--c-accent);" id="filterBadgeName"></span>
+                <button onclick="clearFilter()" style="background:none;border:none;color:var(--c-accent);cursor:pointer;font-size:16px;line-height:1;padding:0;">×</button>
+            </div>
+        </div>
+
+        <!-- ── HOME ─────────────────────────────────────────── -->
+        <div id="page-home" class="page active">
+            <div class="home-layout">
+                <!-- main col -->
+                <div class="home-main">
+                    <!-- AI briefing -->
+                    <div id="aiCard" class="ai-card">
+                        <div class="ai-label"><span class="material-icons-round" style="font-size:14px;">auto_awesome</span> AI Briefing</div>
+                        <div style="display:flex;align-items:center;gap:8px;"><div class="loader" style="width:16px;height:16px;border-width:2px;"></div><span style="font-size:12px;color:var(--c-text-2);">Analisi in corso...</span></div>
+                    </div>
+
+                    <div class="home-section" style="flex:1;overflow:hidden;">
+                        <div class="sec-head">
+                            <span class="sec-title">Attività di oggi</span>
+                            <span id="homeTaskCount" class="badge badge-blue">0</span>
+                        </div>
+                        <div class="home-tasks-list" id="homeTasks"></div>
+                    </div>
+                </div>
+
+                <!-- side col -->
+                <div class="home-side">
+                    <div class="home-section" style="flex:1;overflow:hidden;">
+                        <div class="sec-head"><span class="sec-title">Posta</span></div>
+                        <div id="mailList" style="flex:1;overflow-y:auto;"></div>
+                        <div style="padding:10px 20px;border-top:1px solid var(--c-border);">
+                            <a href="https://mail.google.com" target="_blank" class="btn btn-ghost" style="width:100%;justify-content:center;font-size:12px;">Apri Gmail</a>
+                        </div>
+                    </div>
+                    <div class="home-section" style="flex:1;overflow:hidden;">
+                        <div class="sec-head"><span class="sec-title">Drive</span></div>
+                        <div id="driveList" style="flex:1;overflow-y:auto;"></div>
+                        <div style="padding:10px 20px;border-top:1px solid var(--c-border);">
+                            <a href="https://drive.google.com" target="_blank" class="btn btn-ghost" style="width:100%;justify-content:center;font-size:12px;">Apri Drive</a>
+                        </div>
+                    </div>
+                    <div class="home-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+                        <div class="sec-head"><span class="sec-title">Note veloci</span></div>
+                        <textarea id="quickNotes" class="quick-notes-ta" placeholder="Scrivi appunti..." oninput="deferredSave()"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── CALENDARIO ────────────────────────────────────── -->
+        <div id="page-calendar" class="page">
+            <div class="cal-page">
+                <!-- mobile day tabs -->
+                <div class="day-tabs-mobile" id="dayTabsMobile"></div>
+
+                <!-- 5-col grid -->
+                <div class="cal-grid" id="calGrid"></div>
+
+                <!-- nav -->
+                <div class="cal-nav">
+                    <button class="icon-btn" onclick="changeWeek(-1)"><span class="material-icons-round">chevron_left</span></button>
+                    <span class="cal-nav-label" id="calDateDisplay">...</span>
+                    <button class="icon-btn" onclick="changeWeek(1)"><span class="material-icons-round">chevron_right</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── DA PIANIFICARE ─────────────────────────────────── -->
+        <div id="page-backlog" class="page">
+            <div class="backlog-layout">
+                <div class="bl-form-panel">
+                    <p style="font-size:13px;font-weight:700;letter-spacing:-.01em;margin-bottom:14px;">Aggiungi attività</p>
+                    <label class="form-label">Nome azienda</label>
+                    <input type="text" id="blCompany" class="form-input" placeholder="Es. GEARXPRO"
+                        style="text-transform:uppercase;font-family:var(--mono);font-size:12px;margin-bottom:12px;"
+                        onkeydown="if(event.key==='Enter')document.getElementById('blText').focus()">
+                    <label class="form-label">Descrizione</label>
+                    <textarea id="blText" class="form-textarea" placeholder="Cosa fare...&#10;&#10;⌘+Enter per aggiungere"
+                        onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')addToBacklog()"></textarea>
+                    <button class="btn btn-primary" onclick="addToBacklog()" style="width:100%;justify-content:center;margin-top:12px;">
+                        <span class="material-icons-round">add_task</span> Aggiungi alla lista
+                    </button>
+                </div>
+                <div class="bl-list-panel">
+                    <div class="sec-head" style="padding:14px 20px 10px;border-bottom:1px solid var(--c-border);flex-shrink:0;">
+                        <span class="sec-title">Da pianificare</span>
+                        <span id="backlogCount" class="badge badge-yellow">0</span>
+                    </div>
+                    <div id="suggestBar"></div>
+                    <div class="bl-list" id="backlogList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── NOTE ─────────────────────────────────────────── -->
+        <div id="page-notes" class="page">
+            <div class="notes-page">
+                <div class="notes-col">
+                    <div class="sec-head"><span class="sec-title">Note veloci</span></div>
+                    <textarea id="quickNotes2" class="quick-notes-ta" placeholder="Scrivi..." oninput="syncNotes(this)"></textarea>
+                </div>
+                <div class="notes-col">
+                    <div class="sec-head"><span class="sec-title">AI Briefing</span></div>
+                    <div id="aiCardNotes" style="padding:14px 20px;flex:1;overflow-y:auto;font-size:13px;line-height:1.7;color:var(--c-text-2);">
+                        <div style="color:var(--c-text-3);font-size:12px;">Apri prima la Dashboard per generare il briefing.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /main-content -->
+
+    <!-- Bottom nav (mobile only) -->
+    <nav class="bottom-nav">
+        <button class="bn-btn active" id="bn-home" onclick="nav('home',this)">
+            <span class="material-icons-round">dashboard</span>
+            <span class="bn-label">Home</span>
+        </button>
+        <button class="bn-btn" id="bn-calendar" onclick="nav('calendar',this)">
+            <span class="material-icons-round">calendar_today</span>
+            <span class="bn-label">Cal</span>
+        </button>
+        <button class="bn-btn" id="bn-backlog" onclick="nav('backlog',this)">
+            <span class="material-icons-round">rule</span>
+            <span class="bn-label">Backlog</span>
+        </button>
+        <button class="bn-btn" id="bn-notes" onclick="nav('notes',this)">
+            <span class="material-icons-round">edit_note</span>
+            <span class="bn-label">Note</span>
+        </button>
+    </nav>
+
+</div><!-- /app-shell -->
+
+<script src="script.js"></script>
 </body>
 </html>
