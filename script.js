@@ -2,18 +2,21 @@
 // CONFIG
 // ═══════════════════════════════════════════════════════════
 const PWD = "giuseppe90";
-const PANTRY_ID = "e39b701d-95a9-48c0-ae96-d13b53856c94";
 const GCAL_1 = "https://script.google.com/macros/s/AKfycbxKEBpzjP6zbrato19rFr1YrTU6hKEy9iy712jVmpVa5Lfw2FKtgCX7Lmv_FHnStvwr/exec";
 const GCAL_2 = "https://script.google.com/macros/s/AKfycbx7qYTrubG_KHBkesRUmBxUu3CRI3SC_jhNLH4pxIB0NA5Rgd2nKlgRvmpsToxdJrbN4A/exec";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-// JSONBin — database principale (stesso della v1)
-const JSONBIN_URL = "https://api.jsonbin.io/v3/b/695e8223d0ea881f405b10f2";
-const JSONBIN_KEY = "$2a$10$/b3gwPG1OcyJYyOgtNM.iujzuvPXS5bPnyJvDz5UI9StDI.nQFMQG";
+// Gist config — solo ID pubblici nel codice, token caricato a runtime
+const GIST_ID      = "4b321f9f6bcffb844eaaa2e0b0b8ec43"; // dati agenda
+const GIST_FILE    = "agenda-data.json";
+const GIST_URL     = `https://api.github.com/gists/${GIST_ID}`;
+// Token caricato da localStorage (impostato una volta sola al primo avvio)
+let GIST_TOKEN     = localStorage.getItem('cfu_gh_token') || '';
 
 const isLocal = ["localhost","127.0.0.1",""].includes(location.hostname);
-const BASKET = isLocal ? "Dashboard_TEST_FINAL_V3" : "Dashboard_FINAL_V3";
-const PANTRY_URL = `https://getpantry.cloud/apiv1/pantry/${PANTRY_ID}/basket/${BASKET}`;
+const BASKET   = isLocal ? "Dashboard_TEST_FINAL_V3" : "Dashboard_FINAL_V3";
+const LS_KEY   = `cfu_v3_${BASKET}`;
+const LS_DIRTY = `cfu_dirty_v3_${BASKET}`;
 const LS_KEY  = `cfu_v3_${BASKET}`;
 const LS_DIRTY = `cfu_dirty_v3_${BASKET}`;
 
@@ -91,14 +94,57 @@ function setStatus(state) {
 // ═══════════════════════════════════════════════════════════
 if (localStorage.getItem('auth')==='1') {
     document.getElementById('loginScreen').style.display='none';
-    setTimeout(initApp,100);
+    const savedToken = localStorage.getItem('cfu_gh_token');
+    if (savedToken) { GIST_TOKEN = savedToken; setTimeout(initApp, 100); }
+    else { setTimeout(askForToken, 100); }
 }
 function tryLogin() {
-    if (document.getElementById('passwordInput').value===PWD) {
+    if (document.getElementById('passwordInput').value === PWD) {
         localStorage.setItem('auth','1');
         document.getElementById('loginScreen').style.display='none';
-        initApp();
-    } else { document.getElementById('loginError').style.display='block'; }
+        // Check if token is set
+        if (!localStorage.getItem('cfu_gh_token')) {
+            askForToken();
+        } else {
+            GIST_TOKEN = localStorage.getItem('cfu_gh_token');
+            initApp();
+        }
+    } else {
+        document.getElementById('loginError').style.display='block';
+    }
+}
+
+function askForToken() {
+    const box = document.getElementById('tokenBox');
+    if (box) { box.style.display='flex'; return; }
+    const el = document.createElement('div');
+    el.id = 'tokenBox';
+    el.style.cssText = 'position:fixed;inset:0;background:var(--c-bg);z-index:9999;display:flex;justify-content:center;align-items:center;';
+    el.innerHTML = `
+        <div style="background:var(--c-surface);padding:40px;border-radius:16px;width:380px;border:1px solid var(--c-border);box-shadow:var(--shadow-md);">
+            <h2 style="font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:-.02em;">Configurazione iniziale</h2>
+            <p style="font-size:13px;color:var(--c-text-2);margin-bottom:20px;line-height:1.5;">Inserisci il token GitHub per connettere il database. Viene salvato solo sul tuo dispositivo.</p>
+            <input id="tokenInput" type="password" placeholder="ghp_..." autocomplete="off"
+                style="width:100%;padding:11px 14px;border:1px solid var(--c-border);border-radius:8px;background:var(--c-bg);color:var(--c-text);font-family:var(--mono);font-size:13px;margin-bottom:12px;outline:none;"
+                onkeydown="if(event.key==='Enter')saveToken()">
+            <button onclick="saveToken()" style="width:100%;padding:12px;background:var(--c-accent);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">
+                Connetti →
+            </button>
+            <p id="tokenErr" style="color:var(--c-red);font-size:12px;margin-top:8px;display:none;">Token non valido, riprova.</p>
+        </div>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.querySelector('#tokenInput').focus(), 100);
+}
+
+async function saveToken() {
+    const val = document.getElementById('tokenInput')?.value.trim();
+    if (!val || !val.startsWith('ghp_')) {
+        document.getElementById('tokenErr').style.display = 'block'; return;
+    }
+    localStorage.setItem('cfu_gh_token', val);
+    GIST_TOKEN = val;
+    document.getElementById('tokenBox')?.remove();
+    initApp();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -196,13 +242,16 @@ function nav(page, btn) {
 async function loadData(silent) {
     if (!silent) setStatus('sync');
     try {
-        const res = await fetch(JSONBIN_URL, {
-            method: 'GET',
-            headers: { 'X-Master-Key': JSONBIN_KEY, 'Cache-Control': 'no-cache' }
+        const res = await fetch(GIST_URL, {
+            headers: {
+                'Authorization': `token ${GIST_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
         });
-        if (!res.ok) throw new Error('JSONBin error ' + res.status);
-        const json = await res.json();
-        globalData = json.record || {};
+        if (!res.ok) throw new Error('Gist error ' + res.status);
+        const gist = await res.json();
+        const raw = gist.files?.[GIST_FILE]?.content || '{}';
+        globalData = JSON.parse(raw) || {};
         if (!globalData.backlog) globalData.backlog = [];
         saveToCache(globalData); clearDirty();
         companyList = globalData.COMPANIES || [];
@@ -246,10 +295,14 @@ async function saveData(immediate) {
     saveToCache(globalData);
     if (!navigator.onLine) { markDirty(); setStatus('offline'); if (immediate) showToast('Salvato in locale'); return; }
     try {
-        await fetch(JSONBIN_URL, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-            body: JSON.stringify(globalData)
+        await fetch(GIST_URL, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${GIST_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(globalData) } } })
         });
         clearDirty(); setStatus('ok'); if (immediate) showToast('Salvato');
     } catch(e) { markDirty(); setStatus('offline'); if (immediate) showToast('Salvato in locale'); }
@@ -260,10 +313,13 @@ async function saveData(immediate) {
 // ═══════════════════════════════════════════════════════════
 async function checkConflict() {
     try {
-        const res = await fetch(JSONBIN_URL, { method: 'GET', headers: { 'X-Master-Key': JSONBIN_KEY, 'Cache-Control': 'no-cache' } });
+        const res = await fetch(GIST_URL, {
+            headers: { 'Authorization': `token ${GIST_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
+        });
         if (!res.ok) return;
-        const json = await res.json();
-        const remoteTs = (json.record || {})._savedAt || 0;
+        const gist = await res.json();
+        const raw = gist.files?.[GIST_FILE]?.content || '{}';
+        const remoteTs = (JSON.parse(raw))._savedAt || 0;
         if (remoteTs > getCacheTs() + 5000) showConflictBanner();
     } catch(e) {}
 }
@@ -406,6 +462,13 @@ window.toggleTheme=()=>{
     const d=document.body.getAttribute('data-theme')==='dark';
     document.body.setAttribute('data-theme',d?'light':'dark');
     localStorage.setItem('theme',d?'light':'dark');
+};
+window.resetToken=()=>{
+    if (confirm('Aggiornare il token GitHub? Dovrai inserirne uno nuovo.')) {
+        localStorage.removeItem('cfu_gh_token');
+        GIST_TOKEN = '';
+        askForToken();
+    }
 };
 
 // ═══════════════════════════════════════════════════════════
