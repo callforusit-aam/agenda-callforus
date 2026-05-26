@@ -17,8 +17,6 @@ const isLocal = ["localhost","127.0.0.1",""].includes(location.hostname);
 const BASKET   = isLocal ? "Dashboard_TEST_FINAL_V3" : "Dashboard_FINAL_V3";
 const LS_KEY   = `cfu_v3_${BASKET}`;
 const LS_DIRTY = `cfu_dirty_v3_${BASKET}`;
-const LS_KEY  = `cfu_v3_${BASKET}`;
-const LS_DIRTY = `cfu_dirty_v3_${BASKET}`;
 
 // ═══════════════════════════════════════════════════════════
 // STATE
