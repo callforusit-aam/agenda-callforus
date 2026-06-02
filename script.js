@@ -481,11 +481,25 @@ function renderHome() {
     if(cnt) cnt.innerText=active.length;
     if(!el) return;
     if(!active.length){el.innerHTML=`<div class="empty">Nessuna attività per oggi.</div>`;return;}
-    el.innerHTML=active.map(t=>{
-        const ri=tasks.indexOf(t);
-        let co='';
-        for(let i=ri-1;i>=0;i--){if(tasks[i].isHeader){co=tasks[i].tag?.name||'';break;}}
+
+    // Sort: incomplete first, then by priority (high→low), keep original order within
+    const withMeta = active.map(t => {
+        const ri = tasks.indexOf(t);
+        let co = '';
+        for(let i=ri-1;i>=0;i--){ if(tasks[i].isHeader){ co=tasks[i].tag?.name||''; break; } }
+        return { task: t, ri, co };
+    });
+    withMeta.sort((a,b) => {
+        if(a.task.done !== b.task.done) return a.task.done ? 1 : -1;
+        return (b.task.prio||0) - (a.task.prio||0);
+    });
+
+    const prioColors = ['transparent','#F59E0B','#EF4444'];
+    el.innerHTML = withMeta.map(({task:t, ri, co}) => {
+        const prio = t.prio||0;
         return `<div class="home-task">
+            <span class="prio-dot" style="background:${prioColors[prio]};border-color:${prio?prioColors[prio]:'var(--c-border-2)'};margin-top:3px;"
+                onclick="cyclePrio('${dc}',${ri})"></span>
             <div class="home-task-chk ${t.done?'done':''}" onclick="toggleTask('${dc}',${ri})"></div>
             <div class="home-task-body">
                 ${co?`<div class="home-task-co">${co}</div>`:''}
@@ -597,17 +611,24 @@ function renderCalGrid() {
             const ri=rawData.indexOf(task);
             if(task.isHeader){
                 const bg=task.tag?.bg||'#E5E7EB',col=task.tag?.col||'#000';
-                return `<div class="co-header">
+                return `<div class="co-header" data-day="${code}" data-idx="${ri}"
+                    ondragover="dragOver(event)" ondrop="dragDrop(event,'${code}',${ri})">
                     <span class="co-header-tag" style="background:${bg};color:${col};">${escAttr(task.tag?.name||'')}</span>
                     <span class="co-header-line"></span>
                     <button class="co-del" onclick="deleteTask(event,'${code}',${ri})" title="Elimina gruppo"><span class="material-icons-round" style="font-size:13px;">delete</span></button>
                 </div>`;
             }
+            const prio = task.prio || 0; // 0=none, 1=yellow, 2=red
+            const prioColors = ['transparent', '#F59E0B', '#EF4444'];
+            const prioTitle = ['Nessuna priorità', 'Priorità media', 'Priorità alta'];
             return `<div class="task-row" draggable="true"
                     ondragstart="dragStart(event,'${code}',${ri})"
                     ondragover="dragOver(event)"
-                    ondrop="dragDrop(event,'${code}',${ri})">
+                    ondrop="dragDrop(event,'${code}',${ri})"
+                    ondragend="dragEnd(event)">
                 <span class="drag-handle"><span class="material-icons-round">drag_indicator</span></span>
+                <span class="prio-dot" style="background:${prioColors[prio]};border-color:${prio?prioColors[prio]:'var(--c-border-2)'};"
+                    onclick="cyclePrio('${code}',${ri})" title="${prioTitle[prio]}"></span>
                 <div class="task-chk ${task.done?'done':''}" onclick="toggleTask('${code}',${ri})"></div>
                 <input class="task-inp ${task.done?'done':''}" value="${escAttr(task.txt)}" oninput="updateTask('${code}',${ri},this.value)">
                 <button class="task-del" onclick="deleteTask(event,'${code}',${ri})"><span class="material-icons-round">close</span></button>
@@ -627,7 +648,9 @@ function renderCalGrid() {
             </div>
             <div class="day-prog"><div class="day-prog-fill" style="width:${pct}%"></div></div>
             ${calls.length?`<div class="gcal-strip">${callsHtml}</div>`:''}
-            <div class="day-body">${tasksHtml}${emptySlots}</div>
+            <div class="day-body" data-day="${code}"
+                ondragover="dragOver(event)"
+                ondrop="dropOnDay(event,'${code}')">${tasksHtml}${emptySlots}</div>
         </div>`;
     }).join('');
 }
@@ -716,19 +739,78 @@ window.deleteTask=function(e,day,idx){
     saveData(true); renderCalGrid();
 };
 
-// drag & drop
-let _dragDay,_dragIdx;
-window.dragStart=function(e,day,idx){_dragDay=day;_dragIdx=idx;e.target.style.opacity='.4';e.dataTransfer.effectAllowed='move';};
-window.dragOver=function(e){e.preventDefault();e.dataTransfer.dropEffect='move';return false;};
-window.dragDrop=function(e,tDay,tIdx){
-    e.preventDefault();e.stopPropagation();
-    if(_dragDay===tDay&&_dragIdx!==tIdx){
-        const key=getWeekKey(),list=globalData[key][tDay];
-        const[m]=list.splice(_dragIdx,1);list.splice(tIdx,0,m);
-        saveData(true);renderCalGrid();
-    }
+// drag & drop (supports cross-day)
+let _dragDay, _dragIdx;
+window.dragStart=function(e,day,idx){
+    _dragDay=day; _dragIdx=idx;
+    e.target.style.opacity='.4';
+    e.dataTransfer.effectAllowed='move';
+    // highlight drop zones
+    document.querySelectorAll('.day-col').forEach(c=>c.classList.add('drag-active'));
+};
+window.dragOver=function(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; return false; };
+window.dragEnd=function(e){
+    if(e&&e.target) e.target.style.opacity='';
+    document.querySelectorAll('.day-col').forEach(c=>c.classList.remove('drag-active'));
     document.querySelectorAll('.task-row').forEach(r=>r.style.opacity='');
+};
+
+// Drop on a specific task (reorder within day, or move to position in other day)
+window.dragDrop=function(e,tDay,tIdx){
+    e.preventDefault(); e.stopPropagation();
+    moveTask(_dragDay,_dragIdx,tDay,tIdx);
+    window.dragEnd();
     return false;
+};
+
+// Drop anywhere in a day column (append to end of that day)
+window.dropOnDay=function(e,tDay){
+    e.preventDefault();
+    // only handle if not already handled by a task-row drop
+    if(e.target.closest('.task-row')||e.target.closest('.co-header')) return;
+    moveTask(_dragDay,_dragIdx,tDay,-1);
+    window.dragEnd();
+};
+
+function moveTask(srcDay,srcIdx,tgtDay,tgtIdx){
+    if(srcDay==null||srcIdx==null) return;
+    const key=getWeekKey();
+    if(!globalData[key]) return;
+    const srcList=globalData[key][srcDay];
+    if(!srcList||!srcList[srcIdx]) return;
+
+    // Don't do anything if dropping onto itself
+    if(srcDay===tgtDay&&srcIdx===tgtIdx) return;
+
+    const [moved]=srcList.splice(srcIdx,1);
+
+    if(!globalData[key][tgtDay]) globalData[key][tgtDay]=[];
+    const tgtList=globalData[key][tgtDay];
+
+    if(tgtIdx===-1||tgtIdx>=tgtList.length){
+        tgtList.push(moved);
+    } else {
+        // adjust index if same-day move shifted things
+        let insertAt=tgtIdx;
+        if(srcDay===tgtDay&&srcIdx<tgtIdx) insertAt--;
+        tgtList.splice(insertAt,0,moved);
+    }
+
+    saveData(true);
+    renderCalGrid();
+    renderDayTabsMobile();
+}
+
+// Priority cycling: none → yellow → red → none
+window.cyclePrio=function(day,idx){
+    const key=getWeekKey();
+    if(globalData[key]?.[day]?.[idx]){
+        const cur=globalData[key][day][idx].prio||0;
+        globalData[key][day][idx].prio=(cur+1)%3;
+        saveData(true);
+        renderCalGrid();
+        if(document.getElementById('page-home').classList.contains('active')) renderHome();
+    }
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1324,4 +1406,108 @@ window.resetVoice = function() {
     voiceTranscript = '';
     pendingVoiceTasks = [];
     voiceSetState('voiceIdle');
+};
+
+// ═══════════════════════════════════════════════════════════
+// RECURRING TEMPLATES
+// ═══════════════════════════════════════════════════════════
+function getTemplates() { return globalData.templates || []; }
+function saveTemplates(list) { globalData.templates = list; saveData(true); }
+
+window.openTemplates = function() {
+    // populate company dropdown
+    const sel = document.getElementById('tmplCompany');
+    sel.innerHTML = !companyList.length
+        ? '<option value="">Nessuna azienda</option>'
+        : companyList.map((c,i) => `<option value="${i}">${c.name}</option>`).join('');
+    renderTemplates();
+    openModal('templatesModal');
+};
+
+function renderTemplates() {
+    const list = getTemplates();
+    const el = document.getElementById('templatesList');
+    if (!el) return;
+    const dayNames = {mon:'Lun',tue:'Mar',wed:'Mer',thu:'Gio',fri:'Ven'};
+    if (!list.length) {
+        el.innerHTML = `<div style="text-align:center;padding:24px;font-size:12px;color:var(--c-text-3);">Nessun template. Creane uno qui sotto.</div>`;
+        return;
+    }
+    el.innerHTML = list.map((tmpl, idx) => {
+        const comp = companyList.find(c => c.name === tmpl.company);
+        const bg = comp?.color || '#E5E7EB';
+        const col = getContrast(bg);
+        return `<div style="border:1px solid var(--c-border);border-radius:8px;padding:12px;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-family:var(--mono);font-size:11px;font-weight:700;background:var(--c-bg);padding:2px 8px;border-radius:4px;">${dayNames[tmpl.day]||tmpl.day}</span>
+                    <span style="background:${bg};color:${col};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;">${tmpl.company}</span>
+                </div>
+                <button onclick="deleteTemplate(${idx})" style="background:none;border:none;color:var(--c-text-3);cursor:pointer;font-size:16px;">×</button>
+            </div>
+            <div style="font-size:12px;color:var(--c-text-2);line-height:1.5;">${tmpl.tasks.map(t=>'• '+escAttr(t)).join('<br>')}</div>
+        </div>`;
+    }).join('') + `
+        <button class="btn btn-ghost" onclick="applyAllTemplates()" style="width:100%;justify-content:center;margin-top:8px;">
+            <span class="material-icons-round">playlist_add_check</span> Applica tutti alla settimana corrente
+        </button>`;
+}
+
+window.addTemplate = function() {
+    const day = document.getElementById('tmplDay').value;
+    const ci = document.getElementById('tmplCompany').value;
+    const raw = document.getElementById('tmplTasks').value.trim();
+    if (ci === '' || !companyList[ci]) { showToast('Seleziona un\'azienda'); return; }
+    if (!raw) { showToast('Scrivi almeno un task'); return; }
+    const tasks = raw.split('\n').map(l => l.replace(/^[-•*]\s*/,'').trim()).filter(Boolean);
+    const list = getTemplates();
+    list.push({ day, company: companyList[ci].name, tasks });
+    saveTemplates(list);
+    document.getElementById('tmplTasks').value = '';
+    renderTemplates();
+    showToast('Template salvato');
+};
+
+window.deleteTemplate = function(idx) {
+    const list = getTemplates();
+    if (!list[idx]) return;
+    if (!confirm('Eliminare questo template?')) return;
+    list.splice(idx, 1);
+    saveTemplates(list);
+    renderTemplates();
+};
+
+window.applyAllTemplates = function() {
+    const list = getTemplates();
+    if (!list.length) { showToast('Nessun template da applicare'); return; }
+    const key = getWeekKey();
+    if (!globalData[key]) globalData[key] = {};
+    let added = 0;
+
+    list.forEach(tmpl => {
+        const day = tmpl.day;
+        if (!globalData[key][day]) globalData[key][day] = [];
+        const dayData = globalData[key][day];
+        const comp = companyList.find(c => c.name === tmpl.company);
+        const bg = comp?.color || '#E5E7EB';
+        const col = getContrast(bg);
+
+        // add header if missing
+        if (!dayData.some(t => t.isHeader && t.tag?.name === tmpl.company)) {
+            dayData.push({ txt:'', done:false, isHeader:true, tag:{ name:tmpl.company, bg, col, bd:bg } });
+        }
+        tmpl.tasks.forEach(t => {
+            // avoid exact duplicates
+            if (!dayData.some(x => !x.isHeader && x.txt === t)) {
+                dayData.push({ txt: t, done: false });
+                added++;
+            }
+        });
+    });
+
+    saveData(true);
+    renderCalGrid(); renderDayTabsMobile();
+    if (document.getElementById('page-home').classList.contains('active')) renderHome();
+    closeModal('templatesModal');
+    showToast(`✓ ${added} task aggiunt${added===1?'o':'i'} dai template`);
 };
