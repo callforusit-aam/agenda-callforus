@@ -55,17 +55,15 @@
 
 <!-- ══ MODAL: Pianifica backlog ══════════════════════════════ -->
 <div id="scheduleModal" class="modal-bg">
-    <div class="modal" style="max-width:320px;">
+    <div class="modal" style="max-width:340px;">
         <div class="modal-head">
             <span class="modal-title">Pianifica attività</span>
             <button class="modal-close" onclick="closeModal('scheduleModal')"><span class="material-icons-round">close</span></button>
         </div>
-        <p style="font-size:12px;color:var(--c-text-2);margin-bottom:14px;">Scegli il giorno in cui spostare questa attività:</p>
-        <label class="form-label">Giorno</label>
-        <select id="scheduleDay" class="modal-select">
-            <option value="mon">Lunedì</option><option value="tue">Martedì</option>
-            <option value="wed">Mercoledì</option><option value="thu">Giovedì</option><option value="fri">Venerdì</option>
-        </select>
+        <p style="font-size:12px;color:var(--c-text-2);margin-bottom:14px;">Scegli la data in cui fissare questa attività. Puoi pianificare anche settimane in anticipo.</p>
+        <label class="form-label">Data</label>
+        <input type="date" id="scheduleDate" class="modal-select" style="cursor:pointer;">
+        <p id="scheduleDateInfo" style="font-size:11px;color:var(--c-text-3);margin:-6px 0 14px;"></p>
         <button class="btn btn-primary" onclick="confirmSchedule()" style="width:100%;justify-content:center;">
             <span class="material-icons-round">event_available</span> Fissa nel calendario
         </button>
@@ -329,28 +327,40 @@
 
         <!-- ── DA PIANIFICARE ─────────────────────────────────── -->
         <div id="page-backlog" class="page">
-            <div class="backlog-layout">
-                <div class="bl-form-panel">
-                    <p style="font-size:13px;font-weight:700;letter-spacing:-.01em;margin-bottom:14px;">Aggiungi attività</p>
-                    <label class="form-label">Nome azienda</label>
-                    <input type="text" id="blCompany" class="form-input" placeholder="Es. GEARXPRO"
-                        style="text-transform:uppercase;font-family:var(--mono);font-size:12px;margin-bottom:12px;"
-                        onkeydown="if(event.key==='Enter')document.getElementById('blText').focus()">
-                    <label class="form-label">Descrizione</label>
-                    <textarea id="blText" class="form-textarea" placeholder="Cosa fare...&#10;&#10;⌘+Enter per aggiungere"
-                        onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')addToBacklog()"></textarea>
-                    <button class="btn btn-primary" onclick="addToBacklog()" style="width:100%;justify-content:center;margin-top:12px;">
-                        <span class="material-icons-round">add_task</span> Aggiungi alla lista
-                    </button>
-                </div>
-                <div class="bl-list-panel">
-                    <div class="sec-head" style="padding:14px 20px 10px;border-bottom:1px solid var(--c-border);flex-shrink:0;">
-                        <span class="sec-title">Da pianificare</span>
-                        <span id="backlogCount" class="badge badge-yellow">0</span>
+            <div class="backlog-v2">
+
+                <!-- Top bar: add form + filters -->
+                <div class="bl-topbar">
+                    <div class="bl-add-inline">
+                        <input type="text" id="blCompany" class="bl-add-company" placeholder="AZIENDA"
+                            onkeydown="if(event.key==='Enter')document.getElementById('blText').focus()">
+                        <input type="text" id="blText" class="bl-add-text" placeholder="Nuova attività da pianificare..."
+                            onkeydown="if(event.key==='Enter')addToBacklog()">
+                        <button class="btn btn-primary" onclick="addToBacklog()" style="flex-shrink:0;">
+                            <span class="material-icons-round">add</span> Aggiungi
+                        </button>
                     </div>
-                    <div id="suggestBar"></div>
-                    <div class="bl-list" id="backlogList"></div>
+                    <div class="bl-controls">
+                        <div class="bl-filter-group" id="blCompanyFilters"></div>
+                        <div class="bl-sort">
+                            <select id="blSort" class="bl-sort-select" onchange="renderBacklog()">
+                                <option value="company">Ordina: Azienda</option>
+                                <option value="recent">Ordina: Più recenti</option>
+                                <option value="oldest">Ordina: Più vecchie</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Suggestion bar -->
+                <div id="suggestBar"></div>
+
+                <!-- Company cards grid -->
+                <div class="bl-grid" id="backlogGrid"></div>
+
+                <!-- Hidden count for compat -->
+                <span id="backlogCount" style="display:none;">0</span>
+                <div id="backlogList" style="display:none;"></div>
             </div>
         </div>
 

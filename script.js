@@ -936,40 +936,129 @@ window.addToBacklog=function(){
     renderBacklog();showToast('Attività aggiunta al backlog');
 };
 
+let blActiveFilter = null; // company filter for backlog view
+
 function renderBacklog(){
-    const list=getBacklog();
-    const cnt=document.getElementById('backlogCount');if(cnt)cnt.innerText=list.length;
-    const sb=document.getElementById('suggestBar');
-    const el=document.getElementById('backlogList');if(!el)return;
+    const list = getBacklog();
+    const cnt = document.getElementById('backlogCount');
+    if(cnt) cnt.innerText = list.length;
+    const sb = document.getElementById('suggestBar');
+    const grid = document.getElementById('backlogGrid');
+    if(!grid) return;
+
+    // Build company filter chips
+    renderBacklogFilters();
+
     if(!list.length){
-        if(sb)sb.innerHTML='';
-        el.innerHTML=`<div class="empty">Nessuna attività in backlog.</div>`;return;
+        if(sb) sb.innerHTML='';
+        grid.innerHTML = `<div class="bl-empty"><span class="material-icons-round">task_alt</span><p>Nessuna attività da pianificare.</p><span>Aggiungine una dal campo qui sopra.</span></div>`;
+        return;
     }
-    const sug=getSuggestedDay();
-    if(sb)sb.innerHTML=`<div class="suggest-bar"><span class="material-icons-round">lightbulb</span><span><b>${dayLabel(sug)}</b> è il giorno più libero questa settimana.</span></div>`;
-    el.innerHTML=list.map((item,idx)=>{
-        const comp=companyList.find(c=>c.name===item.company);
-        const bg=comp?comp.color:'#E5E7EB',col=getContrast(bg);
-        const age=Math.floor((Date.now()-new Date(item.createdAt).getTime())/86400000);
-        const ageStr=age===0?'oggi':age===1?'ieri':`${age}g fa`;
-        return `<div class="bl-item">
-            <div class="bl-item-body">
-                <span class="bl-co" style="background:${bg};color:${col};">${escAttr(item.company)}</span>
-                <div class="bl-txt">${escAttr(item.text)}</div>
-                <div class="bl-age">${ageStr}</div>
+
+    // Suggestion bar
+    const sug = getSuggestedDay();
+    if(sb) sb.innerHTML = `<div class="suggest-bar"><span class="material-icons-round">lightbulb</span><span><b>${dayLabel(sug)}</b> è il giorno più libero questa settimana.</span></div>`;
+
+    // Sort order
+    const sortMode = document.getElementById('blSort')?.value || 'company';
+
+    // Group by company
+    const groups = {};
+    list.forEach(item => {
+        const co = item.company || 'ALTRO';
+        if(!groups[co]) groups[co] = [];
+        groups[co].push(item);
+    });
+
+    // Apply company filter
+    let companyNames = Object.keys(groups);
+    if(blActiveFilter) companyNames = companyNames.filter(c => c === blActiveFilter);
+
+    // Sort companies: those matching companyList order first, then alphabetical
+    companyNames.sort((a,b) => {
+        const ia = companyList.findIndex(c => c.name === a);
+        const ib = companyList.findIndex(c => c.name === b);
+        if(ia !== -1 && ib !== -1) return ia - ib;
+        if(ia !== -1) return -1;
+        if(ib !== -1) return 1;
+        return a.localeCompare(b);
+    });
+
+    // Sort tasks within each group
+    const sortTasks = (arr) => {
+        if(sortMode === 'recent') return [...arr].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+        if(sortMode === 'oldest') return [...arr].sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+        return arr; // company mode = keep insertion order
+    };
+
+    grid.innerHTML = companyNames.map(co => {
+        const comp = companyList.find(c => c.name === co);
+        const bg = comp ? comp.color : '#64748B';
+        const col = getContrast(bg);
+        const items = sortTasks(groups[co]);
+
+        const tasksHtml = items.map(item => {
+            const age = Math.floor((Date.now() - new Date(item.createdAt).getTime()) / 86400000);
+            const ageStr = age === 0 ? 'oggi' : age === 1 ? 'ieri' : `${age}g fa`;
+            return `<div class="bl-task" data-id="${item.id}">
+                <div class="bl-task-main">
+                    <span class="bl-task-txt">${escAttr(item.text)}</span>
+                    <span class="bl-task-age">${ageStr}</span>
+                </div>
+                <div class="bl-task-acts">
+                    <button class="bl-task-btn" onclick="openScheduleForId(${item.id})" title="Pianifica"><span class="material-icons-round">event</span></button>
+                    <button class="bl-task-btn del" onclick="deleteBacklogId(${item.id})" title="Elimina"><span class="material-icons-round">close</span></button>
+                </div>
+            </div>`;
+        }).join('');
+
+        return `<div class="bl-card">
+            <div class="bl-card-head" style="background:${bg};color:${col};">
+                <span class="bl-card-name">${escAttr(co)}</span>
+                <span class="bl-card-count">${items.length}</span>
             </div>
-            <div class="bl-acts">
-                <button class="bl-act" onclick="openScheduleFor(${idx})" title="Pianifica"><span class="material-icons-round">event</span></button>
-                <button class="bl-act del" onclick="deleteBacklogItem(${idx})" title="Elimina"><span class="material-icons-round">close</span></button>
-            </div>
+            <div class="bl-card-body">${tasksHtml}</div>
         </div>`;
     }).join('');
 }
 
-window.deleteBacklogItem=function(idx){
-    const l=getBacklog();if(!l[idx])return;
-    if(!confirm(`Eliminare "${l[idx].text}"?`))return;
-    l.splice(idx,1);saveBacklog(l);renderBacklog();showToast('Eliminata');
+function renderBacklogFilters(){
+    const el = document.getElementById('blCompanyFilters');
+    if(!el) return;
+    const list = getBacklog();
+    const companies = [...new Set(list.map(i => i.company))];
+    if(!companies.length){ el.innerHTML=''; return; }
+
+    el.innerHTML = `<button class="bl-chip ${!blActiveFilter?'active':''}" onclick="setBacklogFilter(null)">Tutte</button>` +
+        companies.map(co => {
+            const comp = companyList.find(c => c.name === co);
+            const bg = comp ? comp.color : '#64748B';
+            const active = blActiveFilter === co;
+            return `<button class="bl-chip ${active?'active':''}"
+                style="${active?`background:${bg};color:${getContrast(bg)};border-color:${bg};`:''}"
+                onclick="setBacklogFilter('${co.replace(/'/g,"\\'")}')">${escAttr(co)}</button>`;
+        }).join('');
+}
+
+window.setBacklogFilter = function(co){
+    blActiveFilter = co;
+    renderBacklog();
+};
+
+// ── ID-based operations (stable across sort/filter) ──────────
+window.deleteBacklogId = function(id){
+    const l = getBacklog();
+    const idx = l.findIndex(x => x.id === id);
+    if(idx === -1) return;
+    if(!confirm(`Eliminare "${l[idx].text}"?`)) return;
+    l.splice(idx,1); saveBacklog(l); renderBacklog(); showToast('Eliminata');
+};
+
+window.openScheduleForId = function(id){
+    const l = getBacklog();
+    const idx = l.findIndex(x => x.id === id);
+    if(idx === -1) return;
+    openScheduleFor(idx);
 };
 
 window.openScheduleFor=function(idx){
