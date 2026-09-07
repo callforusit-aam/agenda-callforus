@@ -738,6 +738,28 @@ input[type="color"] { width: 26px; height: 26px; border: 1px solid var(--c-borde
 .qa-input::placeholder { color: var(--c-border-2); }
 .qa-hint { font-size: 11px; color: var(--c-text-3); margin-top: 10px; font-family: var(--mono); }
 
+/* save error banner — big and visible */
+.save-error-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9500;
+    background: var(--c-red); color: #fff;
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 13px; font-weight: 600;
+    box-shadow: 0 2px 12px rgba(0,0,0,.2);
+}
+.save-error-banner .material-icons-round { font-size: 20px; flex-shrink: 0; }
+.save-error-banner .seb-msg { flex: 1; line-height: 1.4; }
+.save-error-banner .seb-btn {
+    background: #fff; color: var(--c-red); border: none;
+    padding: 6px 14px; border-radius: 6px; font-weight: 700;
+    cursor: pointer; font-size: 12px; flex-shrink: 0;
+}
+.save-error-banner .seb-x {
+    background: rgba(255,255,255,.2); border: none; color: #fff;
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+    font-size: 14px; flex-shrink: 0;
+}
+
 /* priority dot */
 .prio-dot {
     width: 9px; height: 9px; border-radius: 50%;

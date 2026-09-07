@@ -193,6 +193,7 @@ function initApp() {
     window.addEventListener('online',()=>{ if(isDirty()){showToast('Connessione ripristinata — sincronizzazione...');saveData(true);} });
     document.addEventListener('visibilitychange',async()=>{ if(!document.hidden&&isDataLoaded) await checkConflict(); });
     startCallNotifications();
+    checkBackupReminder();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -300,8 +301,10 @@ async function saveData(immediate) {
     globalData._savedAt = Date.now();
     saveToCache(globalData);
 
-    // NB: non usiamo navigator.onLine — è inaffidabile su macOS/Chrome
-    // (a volte resta bloccato su false anche con connessione attiva).
+    // Rolling dated backups: keep last 10 snapshots inside the data itself
+    manageBackups();
+
+    // NB: non usiamo navigator.onLine — è inaffidabile su macOS/Chrome.
     // Ci affidiamo al risultato reale del fetch.
 
     try {
@@ -315,21 +318,63 @@ async function saveData(immediate) {
             body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(globalData) } } })
         });
         if (!res.ok) {
-            markDirty(); setStatus('offline');
-            if (res.status === 401) showToast('Token non valido — premi 🔑 per aggiornarlo');
-            else if (res.status === 403) showToast('Troppi salvataggi — riprova tra poco');
-            else showToast('Errore salvataggio (' + res.status + ')');
+            markDirty();
+            if (res.status === 401) showSaveError('Token GitHub non valido o scaduto. Premi 🔑 nella sidebar per inserirne uno nuovo. I dati NON sono salvati online.');
+            else if (res.status === 403) showSaveError('Limite di salvataggi GitHub raggiunto. Aspetta qualche minuto e riprova. I dati sono in locale ma NON ancora online.');
+            else showSaveError('Salvataggio fallito (errore ' + res.status + '). I dati sono in locale ma NON online. Controlla la connessione.');
             console.error('Gist save failed:', res.status, await res.text());
         } else {
-            clearDirty(); setStatus('ok'); if (immediate) showToast('Salvato');
+            clearDirty(); setStatus('ok'); hideSaveError();
+            if (immediate) showToast('Salvato');
         }
     } catch(e) {
-        markDirty(); setStatus('offline');
-        if (immediate) showToast('Errore di connessione');
+        markDirty();
+        showSaveError('Impossibile raggiungere GitHub. I dati sono salvati in locale ma NON online. Verifica la connessione e premi Ricarica.');
         console.error('Save error:', e);
     } finally {
         _saving = false;
         if (_savePending) { _savePending = false; setTimeout(() => saveData(false), 300); }
+    }
+}
+
+// ── Big visible save-error banner ────────────────────────────
+function showSaveError(msg) {
+    setStatus('offline');
+    let b = document.getElementById('saveErrorBanner');
+    if (!b) {
+        b = document.createElement('div');
+        b.id = 'saveErrorBanner';
+        b.className = 'save-error-banner';
+        document.body.prepend(b);
+    }
+    b.innerHTML = `<span class="material-icons-round">warning</span>
+        <span class="seb-msg">${msg}</span>
+        <button onclick="forceSync()" class="seb-btn">Riprova</button>
+        <button onclick="hideSaveError()" class="seb-x">✕</button>`;
+    b.style.display = 'flex';
+}
+window.hideSaveError = function() {
+    const b = document.getElementById('saveErrorBanner');
+    if (b) b.style.display = 'none';
+};
+
+// ── Rolling dated backups (kept inside globalData._backups) ──
+function manageBackups() {
+    if (!globalData._backups) globalData._backups = [];
+    const today = new Date().toISOString().split('T')[0];
+    // one snapshot per day max; snapshot = the week-data only, not the backups themselves
+    const last = globalData._backups[globalData._backups.length - 1];
+    if (!last || last.date !== today) {
+        // build a lightweight snapshot of all week keys + core sections
+        const snap = {};
+        Object.keys(globalData).forEach(k => {
+            if (k.startsWith('W_') || ['COMPANIES','backlog','templates','account','home','notes'].includes(k)) {
+                snap[k] = globalData[k];
+            }
+        });
+        globalData._backups.push({ date: today, ts: Date.now(), data: JSON.stringify(snap) });
+        // keep only last 10
+        if (globalData._backups.length > 10) globalData._backups = globalData._backups.slice(-10);
     }
 }
 
@@ -1727,3 +1772,118 @@ window.applyAllTemplates = function() {
     closeModal('templatesModal');
     showToast(`✓ ${added} task aggiunt${added===1?'o':'i'} dai template`);
 };
+
+// ═══════════════════════════════════════════════════════════
+// BACKUP & RESTORE
+// ═══════════════════════════════════════════════════════════
+window.openBackups = function() {
+    renderBackupsList();
+    openModal('backupsModal');
+};
+
+function renderBackupsList() {
+    const el = document.getElementById('backupsList');
+    if (!el) return;
+    const backups = (globalData._backups || []).slice().reverse();
+    if (!backups.length) {
+        el.innerHTML = `<div style="text-align:center;padding:24px;font-size:12px;color:var(--c-text-3);">Nessuno snapshot ancora. Il primo verrà creato al prossimo salvataggio.</div>`;
+        return;
+    }
+    el.innerHTML = backups.map((b, i) => {
+        const d = new Date(b.ts);
+        const dateStr = d.toLocaleDateString('it-IT', { weekday:'short', day:'numeric', month:'long' });
+        const timeStr = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+        // count weeks in snapshot
+        let weeks = 0;
+        try { const s = JSON.parse(b.data); weeks = Object.keys(s).filter(k=>k.startsWith('W_')).length; } catch(e){}
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--c-border);border-radius:8px;margin-bottom:6px;">
+            <div>
+                <div style="font-size:13px;font-weight:600;">${dateStr.charAt(0).toUpperCase()+dateStr.slice(1)}</div>
+                <div style="font-size:11px;color:var(--c-text-3);font-family:var(--mono);">${timeStr} · ${weeks} settimane</div>
+            </div>
+            <button class="btn btn-ghost" onclick="restoreBackup(${b.ts})" style="padding:6px 12px;font-size:12px;">Ripristina</button>
+        </div>`;
+    }).join('');
+}
+
+window.restoreBackup = function(ts) {
+    const backup = (globalData._backups || []).find(b => b.ts === ts);
+    if (!backup) return;
+    if (!confirm('Ripristinare questo snapshot? I dati attuali verranno sostituiti (ma resta un backup anche di questi).')) return;
+    try {
+        const snap = JSON.parse(backup.data);
+        // keep current backups array, replace everything else
+        const keepBackups = globalData._backups;
+        // remove all week keys and core sections, then apply snapshot
+        Object.keys(globalData).forEach(k => {
+            if (k.startsWith('W_') || ['COMPANIES','backlog','templates','account','home','notes'].includes(k)) {
+                delete globalData[k];
+            }
+        });
+        Object.assign(globalData, snap);
+        globalData._backups = keepBackups;
+        companyList = globalData.COMPANIES || [];
+        saveData(true);
+        renderAll();
+        closeModal('backupsModal');
+        showToast('Snapshot ripristinato');
+    } catch(e) {
+        showToast('Errore nel ripristino');
+        console.error(e);
+    }
+};
+
+window.downloadBackup = function() {
+    const dataStr = JSON.stringify(globalData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0];
+    a.href = url;
+    a.download = `agenda-backup-${today}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup scaricato');
+    // mark that a manual backup was done today
+    localStorage.setItem('cfu_last_backup', today);
+};
+
+window.restoreFromFile = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            if (!confirm('Ripristinare i dati da questo file? I dati attuali verranno sostituiti.')) return;
+            globalData = parsed;
+            if (!globalData.backlog) globalData.backlog = [];
+            companyList = globalData.COMPANIES || [];
+            saveData(true);
+            renderAll();
+            closeModal('backupsModal');
+            showToast('Dati ripristinati dal file');
+        } catch(err) {
+            showToast('File non valido');
+            console.error(err);
+        }
+    };
+    reader.readAsText(file);
+    input.value = '';
+};
+
+// ── Weekly export reminder ───────────────────────────────────
+function checkBackupReminder() {
+    const lastBackup = localStorage.getItem('cfu_last_backup');
+    const today = new Date();
+    // remind on Fridays if no backup in the last 7 days
+    if (today.getDay() !== 5) return; // only Friday
+    if (lastBackup) {
+        const diff = (Date.now() - new Date(lastBackup).getTime()) / 86400000;
+        if (diff < 6) return;
+    }
+    // show a gentle reminder toast after load
+    setTimeout(() => {
+        showToast('💾 È venerdì — scarica un backup dalla sezione 🕘', 5000);
+    }, 3000);
+}

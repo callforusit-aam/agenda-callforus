@@ -88,6 +88,30 @@
     </div>
 </div>
 
+<!-- ══ BACKUPS MODAL ════════════════════════════════════════ -->
+<div id="backupsModal" class="modal-bg">
+    <div class="modal" style="max-width:460px;">
+        <div class="modal-head">
+            <span class="modal-title">Backup e ripristino</span>
+            <button class="modal-close" onclick="closeModal('backupsModal')"><span class="material-icons-round">close</span></button>
+        </div>
+        <p style="font-size:12px;color:var(--c-text-2);margin-bottom:16px;line-height:1.5;">
+            L'app salva automaticamente uno snapshot al giorno (ultimi 10). Puoi ripristinare una versione precedente o scaricare un backup completo.
+        </p>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button class="btn btn-primary" onclick="downloadBackup()" style="flex:1;justify-content:center;">
+                <span class="material-icons-round">download</span> Scarica backup (.json)
+            </button>
+            <button class="btn btn-ghost" onclick="document.getElementById('restoreFileInput').click()" style="flex:1;justify-content:center;">
+                <span class="material-icons-round">upload</span> Ripristina da file
+            </button>
+            <input type="file" id="restoreFileInput" accept=".json" style="display:none;" onchange="restoreFromFile(this)">
+        </div>
+        <p style="font-size:11px;font-weight:600;color:var(--c-text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Snapshot automatici</p>
+        <div id="backupsList" style="max-height:280px;overflow-y:auto;"></div>
+    </div>
+</div>
+
 <!-- ══ TEMPLATES MODAL ══════════════════════════════════════ -->
 <div id="templatesModal" class="modal-bg">
     <div class="modal" style="max-width:520px;">
@@ -206,6 +230,9 @@
             </button>
             <button class="sb-btn" onclick="toggleTheme()" data-tip="Tema">
                 <span class="material-icons-round">dark_mode</span>
+            </button>
+            <button class="sb-btn" onclick="openBackups()" data-tip="Backup e ripristino">
+                <span class="material-icons-round">history</span>
             </button>
             <button class="sb-btn" onclick="resetToken()" data-tip="Aggiorna token">
                 <span class="material-icons-round">key</span>
