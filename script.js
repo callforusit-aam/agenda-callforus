@@ -282,16 +282,26 @@ function deferredSave() {
 }
 window.manualSave = () => saveData(true);
 
+let _saving = false;
+let _savePending = false;
+
 async function saveData(immediate) {
     if (!isDataLoaded) return;
     if (immediate) clearTimeout(saveTimer);
+
+    // Prevent overlapping writes to the same Gist
+    if (_saving) { _savePending = true; return; }
+    _saving = true;
+
     setStatus('wait');
     const qn = document.getElementById('quickNotes');
     if (qn) globalData.home = { quick: qn.value };
     globalData.COMPANIES = companyList;
     globalData._savedAt = Date.now();
     saveToCache(globalData);
-    if (!navigator.onLine) { markDirty(); setStatus('offline'); if (immediate) showToast('Salvato in locale'); return; }
+
+    if (!navigator.onLine) { markDirty(); setStatus('offline'); _saving = false; if (immediate) showToast('Salvato in locale'); return; }
+
     try {
         const res = await fetch(GIST_URL, {
             method: 'PATCH',
@@ -303,22 +313,22 @@ async function saveData(immediate) {
             body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(globalData) } } })
         });
         if (!res.ok) {
-            // Token scaduto/revocato o altro errore
-            markDirty();
-            setStatus('offline');
-            if (res.status === 401) {
-                showToast('Token non valido — premi 🔑 per aggiornarlo');
-            } else {
-                showToast('Errore salvataggio (' + res.status + ')');
-            }
+            markDirty(); setStatus('offline');
+            if (res.status === 401) showToast('Token non valido — premi 🔑 per aggiornarlo');
+            else if (res.status === 403) showToast('Troppi salvataggi — riprova tra poco');
+            else showToast('Errore salvataggio (' + res.status + ')');
             console.error('Gist save failed:', res.status, await res.text());
-            return;
+        } else {
+            clearDirty(); setStatus('ok'); if (immediate) showToast('Salvato');
         }
-        clearDirty(); setStatus('ok'); if (immediate) showToast('Salvato');
     } catch(e) {
         markDirty(); setStatus('offline');
         if (immediate) showToast('Salvato in locale');
         console.error('Save error:', e);
+    } finally {
+        _saving = false;
+        // If another save was requested while this one ran, do it now
+        if (_savePending) { _savePending = false; setTimeout(() => saveData(false), 300); }
     }
 }
 
