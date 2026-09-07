@@ -300,7 +300,9 @@ async function saveData(immediate) {
     globalData._savedAt = Date.now();
     saveToCache(globalData);
 
-    if (!navigator.onLine) { markDirty(); setStatus('offline'); _saving = false; if (immediate) showToast('Salvato in locale'); return; }
+    // NB: non usiamo navigator.onLine — è inaffidabile su macOS/Chrome
+    // (a volte resta bloccato su false anche con connessione attiva).
+    // Ci affidiamo al risultato reale del fetch.
 
     try {
         const res = await fetch(GIST_URL, {
@@ -323,11 +325,10 @@ async function saveData(immediate) {
         }
     } catch(e) {
         markDirty(); setStatus('offline');
-        if (immediate) showToast('Salvato in locale');
+        if (immediate) showToast('Errore di connessione');
         console.error('Save error:', e);
     } finally {
         _saving = false;
-        // If another save was requested while this one ran, do it now
         if (_savePending) { _savePending = false; setTimeout(() => saveData(false), 300); }
     }
 }
