@@ -293,7 +293,7 @@ async function saveData(immediate) {
     saveToCache(globalData);
     if (!navigator.onLine) { markDirty(); setStatus('offline'); if (immediate) showToast('Salvato in locale'); return; }
     try {
-        await fetch(GIST_URL, {
+        const res = await fetch(GIST_URL, {
             method: 'PATCH',
             headers: {
                 'Authorization': `token ${GIST_TOKEN}`,
@@ -302,8 +302,24 @@ async function saveData(immediate) {
             },
             body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(globalData) } } })
         });
+        if (!res.ok) {
+            // Token scaduto/revocato o altro errore
+            markDirty();
+            setStatus('offline');
+            if (res.status === 401) {
+                showToast('Token non valido — premi 🔑 per aggiornarlo');
+            } else {
+                showToast('Errore salvataggio (' + res.status + ')');
+            }
+            console.error('Gist save failed:', res.status, await res.text());
+            return;
+        }
         clearDirty(); setStatus('ok'); if (immediate) showToast('Salvato');
-    } catch(e) { markDirty(); setStatus('offline'); if (immediate) showToast('Salvato in locale'); }
+    } catch(e) {
+        markDirty(); setStatus('offline');
+        if (immediate) showToast('Salvato in locale');
+        console.error('Save error:', e);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
