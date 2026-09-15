@@ -194,6 +194,16 @@ function initApp() {
     document.addEventListener('visibilitychange',async()=>{ if(!document.hidden&&isDataLoaded) await checkConflict(); });
     startCallNotifications();
     checkBackupReminder();
+
+    // Auto-recovery watchdog: if we're in offline state, silently retry every 20s
+    setInterval(() => {
+        const dot = document.getElementById('statusDot');
+        const isOffline = dot && dot.classList.contains('off');
+        if (isOffline && isDataLoaded) {
+            // try a lightweight reload; if it works, status flips back to ok
+            loadData(true);
+        }
+    }, 20000);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -236,12 +246,38 @@ function nav(page, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// FETCH WITH RETRY (handles flaky network, slow servers)
+// ═══════════════════════════════════════════════════════════
+async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 12000) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            const res = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timer);
+            // Retry on rate-limit or server errors
+            if ((res.status === 403 || res.status === 429 || res.status >= 500) && attempt < retries) {
+                await new Promise(r => setTimeout(r, 800 * (attempt + 1))); // backoff
+                continue;
+            }
+            return res;
+        } catch (e) {
+            if (attempt < retries) {
+                await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+                continue;
+            }
+            throw e;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
 // LOAD / SAVE
 // ═══════════════════════════════════════════════════════════
 async function loadData(silent) {
     if (!silent) setStatus('sync');
     try {
-        const res = await fetch(GIST_URL, {
+        const res = await fetchWithRetry(GIST_URL, {
             headers: {
                 'Authorization': `token ${GIST_TOKEN}`,
                 'Accept': 'application/vnd.github.v3+json'
@@ -256,13 +292,14 @@ async function loadData(silent) {
         companyList = globalData.COMPANIES || [];
         isDataLoaded = true;
         document.getElementById('loadingScreen').style.display = 'none';
-        if (!silent) setStatus('ok');
+        setStatus('ok'); hideSaveError();
         renderAll(); fetchGoogle();
     } catch(e) {
         const c = loadFromCache();
         if (c && !isDataLoaded) { globalData = c; companyList = globalData.COMPANIES || []; renderAll(); }
         setStatus('offline'); isDataLoaded = true;
         document.getElementById('loadingScreen').style.display = 'none';
+        console.error('Load error:', e);
     }
 }
 
@@ -308,7 +345,7 @@ async function saveData(immediate) {
     // Ci affidiamo al risultato reale del fetch.
 
     try {
-        const res = await fetch(GIST_URL, {
+        const res = await fetchWithRetry(GIST_URL, {
             method: 'PATCH',
             headers: {
                 'Authorization': `token ${GIST_TOKEN}`,
@@ -403,26 +440,35 @@ function showConflictBanner() {
 // ═══════════════════════════════════════════════════════════
 // GOOGLE
 // ═══════════════════════════════════════════════════════════
-async function fetchGoogle() {
+async function fetchGoogle(isRetry) {
     if(GCAL_1.includes("LINK")) return;
     const s=new Date(currentMon),e=new Date(currentMon);e.setDate(e.getDate()+5);
+    const gfetch = (url) => fetchWithRetry(url, {}, 2, 10000).then(r=>r.json()).catch(()=>null);
     try {
         const [ev1,ev2,d1,d2]=await Promise.all([
-            fetch(`${GCAL_1}?action=calendar&start=${s.toISOString()}&end=${e.toISOString()}`).then(r=>r.json()).catch(()=>[]),
-            fetch(`${GCAL_2}?action=calendar&start=${s.toISOString()}&end=${e.toISOString()}`).then(r=>r.json()).catch(()=>[]),
-            fetch(`${GCAL_1}?action=data`).then(r=>r.json()).catch(()=>({email:[],drive:[]})),
-            fetch(`${GCAL_2}?action=data`).then(r=>r.json()).catch(()=>({email:[],drive:[]}))
+            gfetch(`${GCAL_1}?action=calendar&start=${s.toISOString()}&end=${e.toISOString()}`),
+            gfetch(`${GCAL_2}?action=calendar&start=${s.toISOString()}&end=${e.toISOString()}`),
+            gfetch(`${GCAL_1}?action=data`),
+            gfetch(`${GCAL_2}?action=data`)
         ]);
-        gcalData=[...ev1,...ev2];
+        gcalData=[...(ev1||[]),...(ev2||[])];
         googleMixData={
-            email:[...(d1.email||[]),...(d2.email||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)),
-            drive:[...(d1.drive||[]),...(d2.drive||[])]
+            email:[...((d1&&d1.email)||[]),...((d2&&d2.email)||[])].sort((a,b)=>new Date(b.date)-new Date(a.date)),
+            drive:[...((d1&&d1.drive)||[]),...((d2&&d2.drive)||[])]
         };
         renderCallStrip();
         if(document.getElementById('page-home').classList.contains('active')) renderExternalData();
         if(document.getElementById('page-calendar').classList.contains('active')) renderCalendar();
         startCallNotifications();
-    }catch(e){console.error("Google:",e);}
+
+        // If both calendar sources failed (null) and this wasn't already a retry, try once more
+        if(!isRetry && ev1===null && ev2===null){
+            setTimeout(()=>fetchGoogle(true), 3000);
+        }
+    }catch(e){
+        console.error("Google:",e);
+        if(!isRetry) setTimeout(()=>fetchGoogle(true), 3000);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
