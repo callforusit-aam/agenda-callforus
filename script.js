@@ -287,6 +287,7 @@ async function loadData(silent) {
         const gist = await res.json();
         const raw = gist.files?.[GIST_FILE]?.content || '{}';
         globalData = JSON.parse(raw) || {};
+        if (globalData._backups) delete globalData._backups; // pulizia: i backup stanno nel file separato
         if (!globalData.backlog) globalData.backlog = [];
         saveToCache(globalData); clearDirty();
         companyList = globalData.COMPANIES || [];
@@ -395,24 +396,64 @@ window.hideSaveError = function() {
     if (b) b.style.display = 'none';
 };
 
-// ── Rolling dated backups (kept inside globalData._backups) ──
+// ── Rolling dated backups (stored in a SEPARATE gist file) ──
+// I backup NON stanno più in globalData per non gonfiare/corrompere
+// il file dati principale. Vengono scritti in agenda-backups.json.
+let _backupQueue = [];
+
 function manageBackups() {
-    if (!globalData._backups) globalData._backups = [];
+    // Rimuovi eventuali vecchi backup rimasti dentro globalData (pulizia)
+    if (globalData._backups) delete globalData._backups;
+
     const today = new Date().toISOString().split('T')[0];
-    // one snapshot per day max; snapshot = the week-data only, not the backups themselves
-    const last = globalData._backups[globalData._backups.length - 1];
-    if (!last || last.date !== today) {
-        // build a lightweight snapshot of all week keys + core sections
-        const snap = {};
-        Object.keys(globalData).forEach(k => {
-            if (k.startsWith('W_') || ['COMPANIES','backlog','templates','account','home','notes'].includes(k)) {
-                snap[k] = globalData[k];
+    const lastDay = localStorage.getItem('cfu_last_backup_day');
+    if (lastDay === today) return; // già fatto oggi
+
+    // Costruisci snapshot leggero (solo dati core)
+    const snap = {};
+    Object.keys(globalData).forEach(k => {
+        if (k.startsWith('W_') || ['COMPANIES','backlog','templates','account','home','notes'].includes(k)) {
+            snap[k] = globalData[k];
+        }
+    });
+    _backupQueue.push({ date: today, ts: Date.now(), data: JSON.stringify(snap) });
+    localStorage.setItem('cfu_last_backup_day', today);
+
+    // Scrivi i backup nel file separato (asincrono, non blocca il salvataggio principale)
+    flushBackups();
+}
+
+async function flushBackups() {
+    if (!_backupQueue.length) return;
+    try {
+        // leggi i backup esistenti dal file separato
+        let existing = [];
+        try {
+            const res = await fetchWithRetry(GIST_URL, {
+                headers: { 'Authorization': `token ${GIST_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
+            });
+            if (res.ok) {
+                const gist = await res.json();
+                const raw = gist.files?.['agenda-backups.json']?.content;
+                if (raw) existing = JSON.parse(raw);
             }
+        } catch(e) {}
+
+        // aggiungi i nuovi, tieni solo gli ultimi 10
+        existing = existing.concat(_backupQueue);
+        if (existing.length > 10) existing = existing.slice(-10);
+        _backupQueue = [];
+
+        await fetchWithRetry(GIST_URL, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${GIST_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ files: { 'agenda-backups.json': { content: JSON.stringify(existing) } } })
         });
-        globalData._backups.push({ date: today, ts: Date.now(), data: JSON.stringify(snap) });
-        // keep only last 10
-        if (globalData._backups.length > 10) globalData._backups = globalData._backups.slice(-10);
-    }
+    } catch(e) { console.error('Backup flush error:', e); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1822,24 +1863,40 @@ window.applyAllTemplates = function() {
 // ═══════════════════════════════════════════════════════════
 // BACKUP & RESTORE
 // ═══════════════════════════════════════════════════════════
-window.openBackups = function() {
-    renderBackupsList();
+window.openBackups = async function() {
     openModal('backupsModal');
+    const el = document.getElementById('backupsList');
+    if (el) el.innerHTML = `<div style="text-align:center;padding:24px;"><div class="loader" style="margin:0 auto;"></div></div>`;
+    await loadBackupsList();
 };
+
+let _loadedBackups = [];
+async function loadBackupsList() {
+    try {
+        const res = await fetchWithRetry(GIST_URL, {
+            headers: { 'Authorization': `token ${GIST_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
+        });
+        if (res.ok) {
+            const gist = await res.json();
+            const raw = gist.files?.['agenda-backups.json']?.content;
+            _loadedBackups = raw ? JSON.parse(raw) : [];
+        }
+    } catch(e) { _loadedBackups = []; }
+    renderBackupsList();
+}
 
 function renderBackupsList() {
     const el = document.getElementById('backupsList');
     if (!el) return;
-    const backups = (globalData._backups || []).slice().reverse();
+    const backups = _loadedBackups.slice().reverse();
     if (!backups.length) {
-        el.innerHTML = `<div style="text-align:center;padding:24px;font-size:12px;color:var(--c-text-3);">Nessuno snapshot ancora. Il primo verrà creato al prossimo salvataggio.</div>`;
+        el.innerHTML = `<div style="text-align:center;padding:24px;font-size:12px;color:var(--c-text-3);">Nessuno snapshot ancora. Il primo verrà creato oggi al salvataggio.</div>`;
         return;
     }
-    el.innerHTML = backups.map((b, i) => {
+    el.innerHTML = backups.map(b => {
         const d = new Date(b.ts);
         const dateStr = d.toLocaleDateString('it-IT', { weekday:'short', day:'numeric', month:'long' });
         const timeStr = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-        // count weeks in snapshot
         let weeks = 0;
         try { const s = JSON.parse(b.data); weeks = Object.keys(s).filter(k=>k.startsWith('W_')).length; } catch(e){}
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--c-border);border-radius:8px;margin-bottom:6px;">
@@ -1853,21 +1910,17 @@ function renderBackupsList() {
 }
 
 window.restoreBackup = function(ts) {
-    const backup = (globalData._backups || []).find(b => b.ts === ts);
+    const backup = _loadedBackups.find(b => b.ts === ts);
     if (!backup) return;
-    if (!confirm('Ripristinare questo snapshot? I dati attuali verranno sostituiti (ma resta un backup anche di questi).')) return;
+    if (!confirm('Ripristinare questo snapshot? I dati attuali verranno sostituiti.')) return;
     try {
         const snap = JSON.parse(backup.data);
-        // keep current backups array, replace everything else
-        const keepBackups = globalData._backups;
-        // remove all week keys and core sections, then apply snapshot
         Object.keys(globalData).forEach(k => {
             if (k.startsWith('W_') || ['COMPANIES','backlog','templates','account','home','notes'].includes(k)) {
                 delete globalData[k];
             }
         });
         Object.assign(globalData, snap);
-        globalData._backups = keepBackups;
         companyList = globalData.COMPANIES || [];
         saveData(true);
         renderAll();
