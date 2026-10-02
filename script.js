@@ -8,7 +8,7 @@ const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 // Gist config — solo ID pubblici nel codice, token caricato a runtime
 const GIST_ID      = "4b321f9f6bcffb844eaaa2e0b0b8ec43"; // dati agenda
-const GIST_FILE    = "agenda-data.json";
+const GIST_FILE    = "agenda-data-v2.json"; // nuovo file: le vecchie schede scrivono sul vecchio file e non possono più cancellare questo
 const GIST_URL     = `https://api.github.com/gists/${GIST_ID}`;
 // Token caricato da localStorage (impostato una volta sola al primo avvio)
 let GIST_TOKEN     = localStorage.getItem('cfu_gh_token') || '';
