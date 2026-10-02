@@ -273,6 +273,24 @@ async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 12000)
 }
 
 // ═══════════════════════════════════════════════════════════
+// Gist file content — GESTISCE I FILE TRONCATI
+// L'API di GitHub, quando un Gist contiene file grandi, restituisce
+// content:"" e truncated:true, con un raw_url da cui scaricare il
+// contenuto vero. Senza questo, i file grandi risultano "vuoti".
+// ═══════════════════════════════════════════════════════════
+async function gistFileContent(fileObj) {
+    if (!fileObj) return null;
+    if (fileObj.truncated && fileObj.raw_url) {
+        try {
+            const r = await fetch(fileObj.raw_url + (fileObj.raw_url.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+            if (r.ok) return await r.text();
+        } catch (e) { console.error('raw_url fetch error:', e); }
+        return null; // troncato ma raw non raggiungibile: non fingere che sia vuoto
+    }
+    return fileObj.content || '';
+}
+
+// ═══════════════════════════════════════════════════════════
 // LOAD / SAVE
 // ═══════════════════════════════════════════════════════════
 async function loadData(silent) {
@@ -287,7 +305,7 @@ async function loadData(silent) {
         });
         if (!res.ok) throw new Error('Gist error ' + res.status);
         const gist = await res.json();
-        const raw = gist.files?.[GIST_FILE]?.content;
+        const raw = await gistFileContent(gist.files?.[GIST_FILE]);
         // Se il file remoto è vuoto o illeggibile, NON sovrascrivere: entra in modalità sola-lettura
         if (!raw || !raw.trim() || raw.trim() === '{}') {
             throw new Error('File remoto vuoto');
@@ -467,8 +485,19 @@ async function flushBackups() {
             });
             if (res.ok) {
                 const gist = await res.json();
-                const raw = gist.files?.['agenda-backups.json']?.content;
-                if (raw) { try { existing = JSON.parse(raw); } catch(e) { existing = []; } }
+                const raw = await gistFileContent(gist.files?.['agenda-backups.json']);
+                if (raw) {
+                    try { existing = JSON.parse(raw); }
+                    catch(e) {
+                        // file troncato irrecuperabile: NON azzerare lo storico backup
+                        console.error('Backup read parse error, salto il flush per non perdere lo storico');
+                        _backupQueue = []; return;
+                    }
+                } else {
+                    // non siamo riusciti a leggere i backup esistenti: non sovrascrivere
+                    console.error('Backup esistenti illeggibili, salto il flush');
+                    return;
+                }
             }
         } catch(e) {}
 
@@ -501,7 +530,7 @@ async function checkConflict() {
         });
         if (!res.ok) return;
         const gist = await res.json();
-        const raw = gist.files?.[GIST_FILE]?.content || '{}';
+        const raw = (await gistFileContent(gist.files?.[GIST_FILE])) || '{}';
         const remoteTs = (JSON.parse(raw))._savedAt || 0;
         if (remoteTs > getCacheTs() + 5000) showConflictBanner();
     } catch(e) {}
@@ -1914,7 +1943,7 @@ async function loadBackupsList() {
         });
         if (res.ok) {
             const gist = await res.json();
-            const raw = gist.files?.['agenda-backups.json']?.content;
+            const raw = await gistFileContent(gist.files?.['agenda-backups.json']);
             _loadedBackups = raw ? JSON.parse(raw) : [];
         }
     } catch(e) { _loadedBackups = []; }
