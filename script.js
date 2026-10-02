@@ -278,7 +278,8 @@ async function fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 12000)
 async function loadData(silent) {
     if (!silent) setStatus('sync');
     try {
-        const res = await fetchWithRetry(GIST_URL, {
+        const res = await fetchWithRetry(GIST_URL + '?t=' + Date.now(), {
+            cache: 'no-store',
             headers: {
                 'Authorization': `token ${GIST_TOKEN}`,
                 'Accept': 'application/vnd.github.v3+json'
@@ -460,13 +461,14 @@ async function flushBackups() {
         // leggi i backup esistenti dal file separato
         let existing = [];
         try {
-            const res = await fetchWithRetry(GIST_URL, {
+            const res = await fetchWithRetry(GIST_URL + '?t=' + Date.now(), {
+                cache: 'no-store',
                 headers: { 'Authorization': `token ${GIST_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
             });
             if (res.ok) {
                 const gist = await res.json();
                 const raw = gist.files?.['agenda-backups.json']?.content;
-                if (raw) existing = JSON.parse(raw);
+                if (raw) { try { existing = JSON.parse(raw); } catch(e) { existing = []; } }
             }
         } catch(e) {}
 
@@ -491,8 +493,10 @@ async function flushBackups() {
 // CONFLICT
 // ═══════════════════════════════════════════════════════════
 async function checkConflict() {
+    if (!remoteLoadOk) return; // non controllare conflitti se non abbiamo mai caricato davvero
     try {
-        const res = await fetch(GIST_URL, {
+        const res = await fetch(GIST_URL + '?t=' + Date.now(), {
+            cache: 'no-store',
             headers: { 'Authorization': `token ${GIST_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
         });
         if (!res.ok) return;
@@ -1904,7 +1908,8 @@ window.openBackups = async function() {
 let _loadedBackups = [];
 async function loadBackupsList() {
     try {
-        const res = await fetchWithRetry(GIST_URL, {
+        const res = await fetchWithRetry(GIST_URL + '?t=' + Date.now(), {
+            cache: 'no-store',
             headers: { 'Authorization': `token ${GIST_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
         });
         if (res.ok) {
