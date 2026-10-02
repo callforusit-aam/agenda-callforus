@@ -28,6 +28,7 @@ let gcalData = [];
 let googleMixData = { email:[], drive:[] };
 let saveTimer;
 let isDataLoaded = false;
+let remoteLoadOk = false; // true solo dopo un caricamento VALIDO dal Gist — gate per la scrittura remota
 let pendingBacklogIdx = null;
 let mobileActiveDay = null;  // for mobile day tab selection
 let activeFilter = null;     // company filter
@@ -285,21 +286,31 @@ async function loadData(silent) {
         });
         if (!res.ok) throw new Error('Gist error ' + res.status);
         const gist = await res.json();
-        const raw = gist.files?.[GIST_FILE]?.content || '{}';
+        const raw = gist.files?.[GIST_FILE]?.content;
+        // Se il file remoto è vuoto o illeggibile, NON sovrascrivere: entra in modalità sola-lettura
+        if (!raw || !raw.trim() || raw.trim() === '{}') {
+            throw new Error('File remoto vuoto');
+        }
         globalData = JSON.parse(raw) || {};
         if (globalData._backups) delete globalData._backups; // pulizia: i backup stanno nel file separato
         if (!globalData.backlog) globalData.backlog = [];
         saveToCache(globalData); clearDirty();
         companyList = globalData.COMPANIES || [];
         isDataLoaded = true;
+        remoteLoadOk = true;  // caricamento valido → la scrittura remota è ora abilitata
         document.getElementById('loadingScreen').style.display = 'none';
         setStatus('ok'); hideSaveError();
         renderAll(); fetchGoogle();
     } catch(e) {
+        // Caricamento fallito o file remoto vuoto/corrotto.
+        // Mostra la cache locale per poter lavorare, ma BLOCCA la scrittura remota
+        // così non sovrascriviamo i dati buoni sul Gist con dati vuoti.
         const c = loadFromCache();
-        if (c && !isDataLoaded) { globalData = c; companyList = globalData.COMPANIES || []; renderAll(); }
-        setStatus('offline'); isDataLoaded = true;
+        if (c && !isDataLoaded) { globalData = c; companyList = globalData.COMPANIES || []; renderAll(); fetchGoogle(); }
+        remoteLoadOk = false;
+        isDataLoaded = true;
         document.getElementById('loadingScreen').style.display = 'none';
+        showSaveError('Impossibile caricare i dati dal server (file vuoto o connessione assente). Le modifiche NON vengono salvate online per non cancellare i dati. Premi Ricarica.');
         console.error('Load error:', e);
     }
 }
@@ -330,16 +341,36 @@ async function saveData(immediate) {
 
     // Prevent overlapping writes to the same Gist
     if (_saving) { _savePending = true; return; }
-    _saving = true;
 
-    setStatus('wait');
+    // Aggiorna sempre i campi in memoria + cache locale (questo non rischia nulla)
     const qn = document.getElementById('quickNotes');
     if (qn) globalData.home = { quick: qn.value };
     globalData.COMPANIES = companyList;
     globalData._savedAt = Date.now();
     saveToCache(globalData);
 
-    // Rolling dated backups: keep last 10 snapshots inside the data itself
+    // ── GUARDIA 1: non scrivere sul Gist se il caricamento remoto non è riuscito.
+    // Evita il circolo "carico vuoto → salvo vuoto → cancello i dati buoni".
+    if (!remoteLoadOk) {
+        markDirty();
+        showSaveError('I dati non sono stati caricati dal server, quindi le modifiche restano solo sul questo dispositivo e NON vengono salvate online. Premi Ricarica (↻) per riconnetterti.');
+        return;
+    }
+
+    // ── GUARDIA 2: non scrivere MAI un file sostanzialmente vuoto sul Gist.
+    const weekCount = Object.keys(globalData).filter(k => k.startsWith('W_')).length;
+    const compCount = (globalData.COMPANIES || []).length;
+    const backlogCount = (globalData.backlog || []).length;
+    if (weekCount === 0 && compCount === 0 && backlogCount === 0) {
+        markDirty();
+        showSaveError('Dati vuoti rilevati: salvataggio online bloccato per sicurezza. Premi Ricarica (↻) per recuperare i dati dal server.');
+        return;
+    }
+
+    _saving = true;
+    setStatus('wait');
+
+    // Rolling dated backups nel file separato (non gonfia il file dati principale)
     manageBackups();
 
     // NB: non usiamo navigator.onLine — è inaffidabile su macOS/Chrome.
